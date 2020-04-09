@@ -19,7 +19,7 @@ from formable.yield_functions import (
     YieldFunction, YIELD_FUNCTION_MAP, DEF_3D_RES, DEF_2D_RES)
 
 
-class VolumeElementResponse(object):
+class LoadResponse(object):
 
     def __init__(self, path, load_set):
         """Parse the response file."""
@@ -69,7 +69,7 @@ class VolumeElementResponse(object):
             return np.linalg.eigvals(getattr(self, 'cauchy'))
 
 
-class VolumeElementLoadSet(object):
+class LoadResponseSet(object):
 
     def __init__(self, path, grid_size, num_grains, inc, time, uniaxial_path):
         """
@@ -109,7 +109,7 @@ class VolumeElementLoadSet(object):
             else:
                 self.skipped_uniaxial.append(uniaxial_path)
 
-        self.uniaxial_response = VolumeElementResponse(uni_out_path, self)
+        self.uniaxial_response = LoadResponse(uni_out_path, self)
 
         path = Path(path)
         if not path.is_dir():
@@ -128,7 +128,7 @@ class VolumeElementLoadSet(object):
                     self.skipped.append(i)
                     continue
 
-            self.responses.append(VolumeElementResponse(out_path, self))
+            self.responses.append(LoadResponse(out_path, self))
 
     def compute_yield_stresses(self, yield_points):
         """Compute yield stresses for each load case, for multiple yield points.
