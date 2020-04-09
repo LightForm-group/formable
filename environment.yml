@@ -1,0 +1,12 @@
+name: formable_env
+dependencies:
+- python
+- pip
+- pylint
+- ipykernel
+- rope
+- autopep8
+- twine
+- wheel
+- pyvista    # Should be in setup.py `install_requires` but alas pip cannot find a suitable version...
+- itkwidgets # For pyvista in Jupyter notebook
