@@ -1,7 +1,7 @@
-"""`formable.yield_functions.base.py`
+"""`formable.yielding.base.py`
 
-Contains an abstract base class to represent a yield function. All yield functions inherit
-from this class.
+Contains an abstract base class to represent a yield function. All yield function classes
+inherit from this class.
 
 """
 
@@ -18,7 +18,7 @@ DEF_3D_RES = 50
 DEF_2D_RES = 100
 
 
-def fitting_callable(func):
+def yield_function_fitter(func):
     """Decorator for the `residual` static method of each YieldFunction subclass.
 
     This decorator ensures all yield function parameters are contained within the `kwargs`
@@ -87,47 +87,56 @@ class YieldFunction(metaclass=abc.ABCMeta):
         return value
 
     @classmethod
-    def from_fit(cls, stress_states, **kwargs):
+    def from_fit(cls, stress_states, initial_params=None, **kwargs):
         """Fit the yield function to yield stress states.
 
         Parameters
         ----------
         stress_states : ndarray of shape (N, 3, 3)
+        initial_params : dict 
+            Any initial guesses for the fitting parameters. Mutually exclusive with
+            additional keyword arguments passed, which are considered to be fixed.
         kwargs : dict
             Additional parameters passed to this method will be fixed during the fit.
 
         Returns
         -------
-        YieldFunction
+        yield_function : YieldFunction
             The fitted yield function.
 
         """
 
-        # print('kwargs (1): {}'.format(kwargs))
-
         fitting_param_names = [i for i in cls.PARAMETERS if i not in kwargs]
-        initial_params = np.ones(len(fitting_param_names))
+        initial_params_all = np.ones(len(fitting_param_names))
+
+        if initial_params:
+            for k, initial_guess in initial_params.items():
+                if k not in fitting_param_names:
+                    msg = (f'Initial guess specified for parameter "{k}", but this '
+                           'parameter has also been specified as a keyword argument, '
+                           'indicating it should be fixed.')
+                    raise ValueError(msg)
+                param_idx = fitting_param_names.index(k)
+                initial_params_all[param_idx] = initial_guess
 
         if not fitting_param_names:
 
             # Construct yield function, but no need to fit:
             yield_function = cls(**kwargs)
-            yield_function.fit = None
+            fit = None
 
         else:
 
             # Set something sensible for the initial equivalent stress, if it is a
-            # fitting parameter:
-            if 'equivalent_stress' in fitting_param_names:
+            # fitting parameter, and not given an initial guess:
+            if ('equivalent_stress' in fitting_param_names and
+                    'equivalent_stress' not in initial_params):
                 idx = fitting_param_names.index('equivalent_stress')
-                initial_params[idx] = 50e6
-
-            # print('initial_params: {}'.format(initial_params))
-            # print('fitting_param_names: {}'.format(fitting_param_names))
+                initial_params_all[idx] = 50e6
 
             fit = least_squares(
                 cls.residual,
-                initial_params,
+                initial_params_all,
                 kwargs=dict(
                     stress_states=stress_states,
                     fitting_param_names=fitting_param_names,
@@ -135,17 +144,11 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 )
             )
 
-            # print('kwargs (2): {}'.format(kwargs))
-            # print('fit:\n{}'.format(fit))
-
             parameters = dict(zip(fitting_param_names, fit.x))
-            # print('parameters:\n{}'.format(parameters))
-
             parameters.update(**kwargs)
-            # print('parameters:\n{}'.format(parameters))
-
             yield_function = cls(**parameters)
-            yield_function.fit = fit
+
+        yield_function.fit = fit
 
         return yield_function
 

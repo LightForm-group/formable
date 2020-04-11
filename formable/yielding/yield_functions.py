@@ -1,4 +1,4 @@
-"""`formable.yield_functions.yield_functions.py`
+"""`formable.yielding.yield_functions.py`
 
 Yield function definitions (represented here as Python classes) from the literature.
 
@@ -18,8 +18,8 @@ Each yield function class must define three methods:
 
 import numpy as np
 
-from formable import utils
-from formable.yield_functions import YieldFunction, fitting_callable
+from formable import maths_utils
+from formable.yielding import YieldFunction, yield_function_fitter
 
 
 class VonMises(YieldFunction):
@@ -33,7 +33,8 @@ class VonMises(YieldFunction):
         self.equivalent_stress = equivalent_stress
 
     @staticmethod
-    def residual(fitting_params, stress_states, equivalent_stress):
+    @yield_function_fitter
+    def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
         princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
 
@@ -43,12 +44,8 @@ class VonMises(YieldFunction):
             (princ[:, 1] - princ[:, 2])**2
         )
 
-        value = np.sqrt(diff_sq_sum / 2) - equivalent_stress
-        return value
+        value = np.sqrt(diff_sq_sum / 2) - kwargs['equivalent_stress']
 
-    def get_value(self, stress_states):
-        fitting_params = []
-        value = self.residual(fitting_params, stress_states, self.equivalent_stress)
         return value
 
 
@@ -63,7 +60,7 @@ class Tresca(YieldFunction):
         self.equivalent_stress = equivalent_stress
 
     @staticmethod
-    @fitting_callable
+    @yield_function_fitter
     def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
         princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
@@ -128,9 +125,13 @@ class Barlat_Yld91(YieldFunction):
         self.exponent = exponent
 
     @staticmethod
-    def residual(fitting_params, stress_states, equivalent_stress, exponent):
+    @yield_function_fitter
+    def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
-        a, b, c, f, g, h, = fitting_params
+        a, b, c = kwargs['a'], kwargs['b'], kwargs['c']
+        f, g, h = kwargs['f'], kwargs['g'], kwargs['h']
+        exponent = kwargs['exponent']
+        equivalent_stress = kwargs['equivalent_stress']
 
         # Following notation in original paper:
         A = stress_states[:, 1, 1] - stress_states[:, 2, 2]
@@ -211,12 +212,6 @@ class Barlat_Yld91(YieldFunction):
 
         return value
 
-    def get_value(self, stress_states):
-        fitting_params = [self.a, self.b, self.c, self.f, self.g, self.h]
-        value = self.residual(fitting_params, stress_states,
-                              self.equivalent_stress, self.exponent)
-        return value
-
 
 class Barlat_Yld2000_2D(YieldFunction):
     """Barlat "Yld2000-2D" yield criterion for plane stress anisotropic plasticity.
@@ -280,11 +275,15 @@ class Barlat_Yld2000_2D(YieldFunction):
         self.exponent = exponent
 
     @staticmethod
-    def residual(fitting_params, stress_states, equivalent_stress, exponent):
+    @yield_function_fitter
+    def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
-        a1, a2, a3, a4, a5, a6, a7, a8 = fitting_params
+        a1, a2, a3, a4 = kwargs['a1'], kwargs['a2'], kwargs['a3'], kwargs['a4']
+        a5, a6, a7, a8 = kwargs['a5'], kwargs['a6'], kwargs['a7'], kwargs['a8']
+        exponent = kwargs['exponent']
+        equivalent_stress = kwargs['equivalent_stress']
 
-        stress_v = utils.to_symmetric_voigt_notation(stress_states)
+        stress_v = maths_utils.to_symmetric_voigt_notation(stress_states)
 
         # Select only the planar stress components:
         planar_stress = stress_v[:, [0, 1, 5]]
@@ -317,8 +316,8 @@ class Barlat_Yld2000_2D(YieldFunction):
         X_prime = L_prime @ stress_cols
         X_dprime = L_dprime @ stress_cols
 
-        X_prime_ps = utils.get_plane_stress_principle_stresses(X_prime)
-        X_dprime_ps = utils.get_plane_stress_principle_stresses(X_dprime)
+        X_prime_ps = maths_utils.get_plane_stress_principle_stresses(X_prime)
+        X_dprime_ps = maths_utils.get_plane_stress_principle_stresses(X_dprime)
 
         phi_prime = np.abs(X_prime_ps[0] - X_prime_ps[1]) ** exponent
         phi_dprime = (
@@ -330,21 +329,6 @@ class Barlat_Yld2000_2D(YieldFunction):
 
         value = (phi / 2)**(1 / exponent) - equivalent_stress
 
-        return value
-
-    def get_value(self, stress_states):
-        fitting_params = [
-            self.a1,
-            self.a2,
-            self.a3,
-            self.a4,
-            self.a5,
-            self.a6,
-            self.a7,
-            self.a8
-        ]
-        value = self.residual(fitting_params, stress_states,
-                              self.equivalent_stress, self.exponent)
         return value
 
 
@@ -468,7 +452,7 @@ class Barlat_Yld2004_18p(YieldFunction):
         self.exponent = exponent
 
     @staticmethod
-    @fitting_callable
+    @yield_function_fitter
     def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
         """
         Parameters
@@ -525,15 +509,15 @@ class Barlat_Yld2004_18p(YieldFunction):
             kwargs['c_dp_66'],
         ]
 
-        stress_v = utils.to_symmetric_voigt_notation(stress_states)
-        stress_dev = utils.get_deviatoric_stress(stress_v, voigt=True)
+        stress_v = maths_utils.to_symmetric_voigt_notation(stress_states)
+        stress_dev = maths_utils.get_deviatoric_stress(stress_v, voigt=True)
 
         stress_trans_1 = transform_stress(stress_dev, params[0:9])
         stress_trans_2 = transform_stress(stress_dev, params[9:18])
 
         # Find principal stress values:
-        stress_mat_1 = utils.from_voigt_notation(stress_trans_1)
-        stress_mat_2 = utils.from_voigt_notation(stress_trans_2)
+        stress_mat_1 = maths_utils.from_voigt_notation(stress_trans_1)
+        stress_mat_2 = maths_utils.from_voigt_notation(stress_trans_2)
         stress_princ_1 = np.sort(np.linalg.eigvals(stress_mat_1), axis=-1)[:, ::-1]
         stress_princ_2 = np.sort(np.linalg.eigvals(stress_mat_2), axis=-1)[:, ::-1]
 
@@ -565,25 +549,21 @@ class Hosford(YieldFunction):
         self.exponent = exponent
 
     @staticmethod
-    def residual(self, stress_states, equivalent_stress, exponent):
+    @yield_function_fitter
+    def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
+
+        exponent = kwargs['exponent']
+        equivalent_stress = kwargs['equivalent_stress']
 
         princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
-
         diff_sq_sum = (
-            (princ[:, 0] - princ[:, 1])**self.exponent +
-            (princ[:, 0] - princ[:, 2])**self.exponent +
-            (princ[:, 1] - princ[:, 2])**self.exponent
+            (princ[:, 0] - princ[:, 1])**exponent +
+            (princ[:, 0] - princ[:, 2])**exponent +
+            (princ[:, 1] - princ[:, 2])**exponent
         )
 
-        value = ((diff_sq_sum / 2)**(1/self.exponent)) - self.equivalent_stress
+        value = ((diff_sq_sum / 2)**(1 / exponent)) - equivalent_stress
 
-        return value
-
-    def get_value(self, stress_states):
-
-        fitting_params = []
-        value = self.residual(fitting_params, stress_states,
-                              self.equivalent_stress, self.exponent)
         return value
 
 
@@ -636,9 +616,13 @@ class Hill1979(YieldFunction):
         self.exponent = exponent
 
     @staticmethod
-    def residual(fitting_params, stress_states, equivalent_stress, exponent):
+    @yield_function_fitter
+    def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
-        f, g, h, a, b, c = fitting_params
+        f, g, h = kwargs['f'], kwargs['g'], kwargs['h']
+        a, b, c = kwargs['a'], kwargs['b'], kwargs['c']
+        exponent = kwargs['exponent']
+        equivalent_stress = kwargs['equivalent_stress']
 
         princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
 
@@ -653,13 +637,6 @@ class Hill1979(YieldFunction):
 
         value = diff_exp_sum**(1/exponent) - equivalent_stress
 
-        return value
-
-    def get_value(self, stress_states):
-
-        fitting_params = [self.f, self.g, self.h, self.a, self.b, self.c]
-        value = self.residual(fitting_params, stress_states,
-                              self.equivalent_stress, self.exponent)
         return value
 
 
@@ -705,9 +682,11 @@ class Hill1948(YieldFunction):
         self.N = N
 
     @staticmethod
-    def residual(fitting_params, stress_states):
+    @yield_function_fitter
+    def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
-        F, G, H, L, M, N = fitting_params
+        F, G, H = kwargs['F'], kwargs['G'], kwargs['H']
+        L, M, N = kwargs['L'], kwargs['M'], kwargs['N']
 
         diff_sq_sum = (
             F * (stress_states[:, 1, 1] - stress_states[:, 2, 2])**2 +
@@ -722,14 +701,8 @@ class Hill1948(YieldFunction):
 
         return value
 
-    def get_value(self, stress_states):
 
-        fitting_params = [self.F, self.G, self.H, self.L, self.M, self.N]
-        value = self.residual(fitting_params, stress_states)
-        return value
-
-
-class Dummy(YieldFunction):
+class Dummy2DYieldFunction(YieldFunction):
     'Dummy 2D yield function that resembles a cylinder about the z-axis.'
 
     PARAMETERS = [
@@ -741,14 +714,16 @@ class Dummy(YieldFunction):
         self.radius = radius
 
     @staticmethod
-    def residual(fitting_params, stress_states):
+    @yield_function_fitter
+    def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
+        # princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
         princ = np.linalg.eigvals(stress_states)
-        value = princ[:, 0]**2 + princ[:, 1]**2 - fitting_params[0]**2
-        return value
 
-    def get_value(self, stress_states):
+        # r = 10.4:
+        # value = (np.sqrt(np.abs(princ[:, 0]**2 + princ[:, 1]**2)) / kwargs['radius']) - 1
 
-        fitting_params = [self.radius]
-        value = self.residual(fitting_params, stress_states)
+        # r = 10:
+        value = np.sqrt(np.abs(princ[:, 0]**2 + princ[:, 1]**2)) - kwargs['radius']
+
         return value
