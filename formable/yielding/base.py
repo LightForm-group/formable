@@ -6,6 +6,8 @@ inherit from this class.
 """
 
 import abc
+import functools
+
 import numpy as np
 import pyvista as pv
 from plotly import graph_objects
@@ -26,7 +28,7 @@ def yield_function_fitter(func):
     which parameters are being fitted and which are static).
 
     """
-
+    @functools.wraps(func)
     def inner(fitting_params, stress_states, fitting_param_names, **kwargs):
         params = dict(zip(fitting_param_names, fitting_params))
         kwargs.update(**params)
