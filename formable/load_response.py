@@ -322,7 +322,9 @@ class LoadResponseSet(object):
             for ypc_val_idx, yld_stress in enumerate(self.yield_stresses[ypc_idx]):
 
                 # Perform fit:
-                yld_func_obj = yield_function.from_fit(yld_stress, **kwargs[ypc_val_idx])
+                yld_func_obj = yield_function.from_fit(
+                    yld_stress['values'], **kwargs[ypc_val_idx]
+                )
                 yld_func_list.append(yld_func_obj)
 
             self.yield_functions[yld_func_name].append(yld_func_list)
