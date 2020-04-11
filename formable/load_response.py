@@ -306,7 +306,7 @@ class LoadResponseSet(object):
                 raise ValueError(msg)
             yield_function = YIELD_FUNCTION_MAP[yield_function]
 
-        elif not isinstance(yield_function, YieldFunction):
+        elif not issubclass(yield_function, YieldFunction):
             raise TypeError(msg)
 
         yld_func_name = yield_function.__name__
