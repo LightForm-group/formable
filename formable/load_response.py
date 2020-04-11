@@ -1,41 +1,4 @@
-"""`formable.load_response.py`
-
-TODO:
-    - This needs generalising.
-        - The contained classes should be useful for fitting yield functions to
-          experimental tests as well as simulated tests.
-        - This package should not depend on `damask-parse`.
-        - ideally, want to codify a "yield condition" that is used to extract the yield stress.
-        - so true_stress will be a required input, along with some measure of strain,
-          but the type of strain need not be fixed. For now, assume it should be a scalar,
-          and that we should be able to pass multiple types. E.g. von mises equivalent strain,
-          and total shear.
-        - Start with just accepting:
-            - true stress
-            - strain_scalar (for now, just: equivalent_strain (i.e. Von Mises equivalent strain))
-        - Later, also allow passing a tensor of a known quantity, which is then
-          converted to a scalar measure of strain. E.g could convert from deformation gradient
-          into logarithmic (i.e. true) strain tensor, and from there into von Mises
-          equivalent strain scalar.
-        - Note: "von Mises equivalent stress/strain" have inverse factors of sqrt(2/3)...
-
-    - TODO: move all decorators into separate module? can `import .... as ..` so they have
-        sensible names in the modules in which they are used.
-
-    - TODO: add to/from_json
-
-    - TODO: should LoadResponseSet *store* calculated yield stresses?
-        - Yes: will be saved in json
-        - No: adds complexity, can't guarantee data is not corrupted when init-ing?
-
-    - matflow integration:
-        - matflow-formable will provide interface
-
-    - TensileTest could subclass LoadResponse? Could have dimension attribute, which
-      is the max dimension considered in any analysis (1, 2 or 3). Then the
-      `incremental_data` outer shape would be of that size.
-
-"""
+"""`formable.load_response.py`"""
 
 import copy
 from pathlib import Path
