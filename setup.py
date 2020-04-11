@@ -45,8 +45,8 @@ setup(
         'numpy',
         'plotly',
         'vecmaths',
-        # 'pyvista',
-        # 'itkwidgets', # for pyvista in Jupyter notebooks
+        'pyvista',
+        'itkwidgets',  # for pyvista in Jupyter notebooks
     ],
     project_urls={
         'Github': 'URL',
