@@ -86,7 +86,7 @@ class YieldPointCriteria(object):
         return (f'{self.__class__.__name__}('
                 f'threshold={self.threshold!r}, '
                 f'values={self.values!r}, '
-                f'source={self.source!r}')
+                f'source={self.source!r})')
 
     def get_formatted(self, values_idx=None):
         if values_idx > (len(self) - 1):
