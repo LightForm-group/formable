@@ -329,6 +329,11 @@ class LoadResponseSet(object):
 
             self.yield_functions[yld_func_name].append(yld_func_list)
 
+    def remove_yield_function_fits(self):
+        'Remove all yield function fits'
+
+        self.yield_functions = {}
+
     def show_yield_functions_3D(self, equivalent_strain=None, normalise=True,
                                 resolution=DEF_3D_RES, equivalent_stress=None,
                                 min_stress=None, max_stress=None, show_axes=True,
