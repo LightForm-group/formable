@@ -111,6 +111,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
         fitting_param_names = [i for i in cls.PARAMETERS if i not in kwargs]
         initial_params_all = np.ones(len(fitting_param_names))
 
+        initial_params = initial_params or {}
+
         if initial_params:
             for k, initial_guess in initial_params.items():
                 if k not in fitting_param_names:
