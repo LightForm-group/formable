@@ -5,9 +5,39 @@ TODO:
         - The contained classes should be useful for fitting yield functions to
           experimental tests as well as simulated tests.
         - This package should not depend on `damask-parse`.
+        - ideally, want to codify a "yield condition" that is used to extract the yield stress.
+        - so true_stress will be a required input, along with some measure of strain,
+          but the type of strain need not be fixed. For now, assume it should be a scalar,
+          and that we should be able to pass multiple types. E.g. von mises equivalent strain,
+          and total shear.
+        - Start with just accepting:
+            - true stress
+            - strain_scalar (for now, just: equivalent_strain (i.e. Von Mises equivalent strain))
+        - Later, also allow passing a tensor of a known quantity, which is then
+          converted to a scalar measure of strain. E.g could convert from deformation gradient
+          into logarithmic (i.e. true) strain tensor, and from there into von Mises
+          equivalent strain scalar.
+        - Note: "von Mises equivalent stress/strain" have inverse factors of sqrt(2/3)...
+
+    - TODO: move all decorators into separate module? can `import .... as ..` so they have
+        sensible names in the modules in which they are used.
+
+    - TODO: add to/from_json
+
+    - TODO: should LoadResponseSet *store* calculated yield stresses?
+        - Yes: will be saved in json
+        - No: adds complexity, can't guarantee data is not corrupted when init-ing?
+
+    - matflow integration:
+        - matflow-formable will provide interface
+
+    - TensileTest could subclass LoadResponse? Could have dimension attribute, which
+      is the max dimension considered in any analysis (1, 2 or 3). Then the
+      `incremental_data` outer shape would be of that size.
 
 """
 
+import copy
 from pathlib import Path
 from warnings import warn
 
@@ -15,188 +45,288 @@ import numpy as np
 from scipy.optimize import least_squares
 from damask_parse import read_table as read_damask_table
 
-from formable.yield_functions import (
+from formable.maths_utils import get_principal_values
+from formable.utils import requires, at_most_one_of
+from formable.yielding import (
     YieldFunction, YIELD_FUNCTION_MAP, DEF_3D_RES, DEF_2D_RES)
+from formable.yielding.yield_point import (
+    YieldPointUnsatisfiedError, init_yield_point_criteria)
+
+
+class InhomogeneousDataError(Exception):
+    pass
 
 
 class LoadResponse(object):
+    """A general class for representing the (simulated or real) response of applying a
+    load to a (model) material."""
 
-    def __init__(self, path, load_set):
-        """Parse the response file."""
-        response = read_damask_table(path)
-        self.load_set = load_set
-        for key, val in response.items():
-            key_san = key.replace('(', '_').replace(')', '_').lower()
-            setattr(self, key_san, val)
+    ALLOWED_DATA = [
+        'true_stress',
+        'equivalent_strain',
+    ]
 
-    def get_yield_stress(self, yield_point, yield_point_column_name):
-        """Find the yield stress associated with a yield_point value."""
+    def __init__(self, **incremental_data):
+        """
+        Parameters
+        ----------
+        incremental_data : dict of (str : ndarray of shape (N, ...))
+            A dict mapping the names of incremental quantities and their values as numpy
+            arrays. Different combinations of quantities are required for different
+            analysis. Arrays for all incremental data must have the same outer shape (N,),
+            which is the number of increments over which the response is considered.
 
-        yield_point_column = getattr(self, yield_point_column_name)
+        Notes
+        -----
+        In future, we can add some more strain scalars that might required additional
+        processing; e.g. the deformation gradient tensor, F, could be passed. It would
+        need to be changed to a strain tensor, and then to a scalar. In this
+        case the `yield_point_value` could be a dict, allowing additional parameters to
+        be passed (the decorator wouldn't need to change). Also, we might want to define
+        the yield point condition more generally, e.g. using a tensor.
 
-        # Linearly interpolate yield stress
-        hi_idx = np.where(abs(yield_point_column) >= yield_point)[0][0]
-        lo_idx = hi_idx - 1
-        hi_yld = abs(yield_point_column[hi_idx])
-        lo_yld = abs(yield_point_column[lo_idx])
+        """
 
-        lo_stress_factor = (hi_yld - yield_point) / (hi_yld - lo_yld)
-        hi_stress_factor = (yield_point - lo_yld) / (hi_yld - lo_yld)
+        if not incremental_data:
+            msg = ('Pass at least one incremental data array. Allowed data is {}.')
+            raise ValueError(msg.format(self.allowed_data_fmt))
 
-        yld_stress = (
-            getattr(self, 'cauchy')[lo_idx] * lo_stress_factor +
-            getattr(self, 'cauchy')[hi_idx] * hi_stress_factor
-        )
+        self._true_stress = incremental_data.pop('true_stress', None)
+        self._equivalent_strain = incremental_data.pop('equivalent_strain', None)
 
-        return yld_stress
-
-    def get_principle_yield_stress(self, yield_point, yield_point_column_name):
-        yld_stress = self.get_yield_stress(yield_point, yield_point_column_name)
-        out = np.linalg.eigvals(yld_stress)
-
-        return out
-
-    def validate(self, *args):
-        """Validate these results against a set of required results."""
-        for attr in args:
-            if not hasattr(self, attr):
-                return False
-        return True
+        if incremental_data:
+            unknown_fmt = ', '.join(['"{}"'.format(i) for i in incremental_data])
+            msg = ('Unknown incremental data "{}". Allowed incremental data are: {}')
+            raise ValueError(msg.format(unknown_fmt, self.allowed_data_fmt))
 
     @property
-    def principle_stress(self):
-        if hasattr(self, 'cauchy'):
-            return np.linalg.eigvals(getattr(self, 'cauchy'))
+    def incremental_data_names(self):
+        'Which of the allowed incremental data does this LoadResponse have?'
+        has = []
+        for allowed in self.ALLOWED_DATA:
+            if getattr(self, allowed) is not None:
+                has.append(allowed)
+        return has
+
+    @staticmethod
+    def required_incremental_data(cls, analysis_type=None):
+        """Get a list of the required incremental data for a given type of analysis."""
+        pass
+
+    @property
+    def allowed_data_fmt(self):
+        'Get a comma-separated list of allowed incremental data.'
+        return ', '.join(['"{}"'.format(i) for i in self.ALLOWED_DATA])
+
+    @property
+    def allowed_yield_point_types_fmt(self):
+        'Get a comma-separated list of allowed incremental data.'
+        return ', '.join(['"{}"'.format(i) for i in YIELD_POINT_FUNC_MAP])
+
+    @property
+    def true_stress(self):
+        return self._true_stress
+
+    @property
+    def equivalent_strain(self):
+        return self._equivalent_strain
+
+    @property
+    @requires('true_stress')
+    def principal_true_stress(self):
+        """Get principal true stress values."""
+        return get_principal_values(self.true_stress)
+
+    @requires('true_stress')
+    @init_yield_point_criteria
+    def get_yield_stress(self, yield_point_criteria, value_idx=None):
+        """Find the yield stresses associated with a yield point criteria.
+
+        Parmeters
+        ---------
+        yield_point_criteria : YieldPointCriterion or dict
+            If a dict, it must be a dict of keyword arguments that can be used to
+            instantiate a YieldPointCriterion object.
+
+        Returns
+        -------
+        yield_stress : ndarray of shape (M, 3, 3)
+            Yield stress tensors, one for each of M yield point criteria values.
+        good_value_idx : list of int
+            Indices of values for which the yield stress was successfully calculated.
+
+        """
+
+        source_dat = getattr(self, yield_point_criteria.source)
+        yield_stress, good_value_idx = yield_point_criteria.get_yield_stress(
+            source_dat, self.true_stress, value_idx=value_idx)
+
+        return yield_stress, good_value_idx
+
+    @init_yield_point_criteria
+    def get_principal_yield_stress(self, yield_point_criteria):
+        """Find the principal yield stresses associated with a yield point criteria.
+
+        Parmeters
+        ---------
+        yield_point_criteria : YieldPointCriterion or dict
+            If a dict, it must be a dict of keyword arguments that can be used to
+            instantiate a YieldPointCriterion object.
+
+        Returns
+        -------
+        yld_stress_principal : ndarray of shape (M, 3)
+            Principal yield stress tensors, one for each of M yield point criteria values,
+            ordered from largest to smallest.
+        value_idx : list of int
+            Indices of values for which the yield stress was successfully calculated.
+
+        """
+
+        yld_stress = self.get_yield_stress(yield_point_criteria)
+        yld_stress_principle, values_idx = get_principal_values(yld_stress)
+        return yld_stress_principle, values_idx
+
+    @requires('true_stress')
+    def is_uniaxial(self, increment=-1, tol=1e-3):
+        """Is the specified increment's true stress state approximately uniaxial?"""
+
+        princ_stress = self.principal_true_stress[increment]
+
+        # Principal values are ordered largest to smallest, so check the first is much
+        # larger than the other two:
+        normed = princ_stress / princ_stress[0]
+
+        print('normed:\n{}\n'.format(normed))
+
+        if (abs(normed[1]) - tol) <= 0 and (abs(normed[2]) - tol) <= 0:
+            return True
+        else:
+            return False
 
 
 class LoadResponseSet(object):
 
-    def __init__(self, path, grid_size, num_grains, inc, time, uniaxial_path):
+    def __init__(self, load_responses):
         """
-        Parameters
-        ----------
-        path : Path object
-            Path to a parent directory of sub directories that contain
-            files from simulations of distinct load cases.
-        """
-
-        self.grid_size = grid_size
-        self.num_grains = num_grains
-        self.inc = inc
-        self.time = time
-
-        # Yield function fits for given "yield point" conditions, assigned in
-        # `add_yield_function_fit`:
-        self.yield_functions = {}
-
-        self.yield_stresses = {}
-        self.uniaxial_yield_stress = {}
-
-        self.skipped = []
-        self.skipped_uniaxial = []
-
-        self.responses = []
-        self.uniaxial_response = None
-
-        uniaxial_path = Path(uniaxial_path)
-        if not uniaxial_path.is_dir():
-            raise ValueError('`unaxial_path` is not a directory.')
-
-        uni_out_path = uniaxial_path.joinpath('geom_load.txt')
-        if not uni_out_path.is_file():
-            if uniaxial_path.joinpath('postProc').is_dir():
-                out_path = uniaxial_path.joinpath('postProc', 'geom_load.txt')
-            else:
-                self.skipped_uniaxial.append(uniaxial_path)
-
-        self.uniaxial_response = LoadResponse(uni_out_path, self)
-
-        path = Path(path)
-        if not path.is_dir():
-            raise ValueError('`path` is not a directory.')
-
-        for i in path.glob('*'):
-
-            if not i.is_dir():
-                continue
-
-            out_path = i.joinpath('geom_load.txt')
-            if not out_path.is_file():
-                if i.joinpath('postProc').is_dir():
-                    out_path = i.joinpath('postProc', 'geom_load.txt')
-                else:
-                    self.skipped.append(i)
-                    continue
-
-            self.responses.append(LoadResponse(out_path, self))
-
-    def compute_yield_stresses(self, yield_points):
-        """Compute yield stresses for each load case, for multiple yield points.
 
         Parameters
         ----------
-        yield_points : list of tuple of (str, number)
-            List of yield point definitions at which to fit the yield function. A yield
-            point definition as two parts: the first is the type of yield point. This
-            must be one of "equivalent_strain" or "total_shear". The second is the value
-            of this quantity at which we are to consider yield to occur.
+        load_responses : list of LoadResponse
+            All LoadResponse objects within the list must have the same set of specified
+            incremental data.
 
         """
 
-        for yld_point in yield_points:
-            yld_point_type, yld_point_val = yld_point
+        # Validate:
+        inc_data = load_responses[0].incremental_data_names
+        for i in load_responses[1:]:
+            if i.incremental_data_names != inc_data:
+                msg = ('All load responses within a {} must have the same set of '
+                       'specified incremental data.')
+                raise InhomogeneousDataError(msg.format(self.__class__.__name__))
 
-            if yld_point in self.yield_stresses:
-                msg = ('Yield point {} has already been calculated.')
-                raise ValueError(msg.format(yld_point))
+        self.responses = load_responses
 
-            self.yield_stresses[yld_point] = self._get_yield_data(
-                yld_point_val, yld_point_type)
-            self.uniaxial_yield_stress[yld_point] = self._get_uniaxial_yield_data(
-                yld_point_val, yld_point_type)
+        self.yield_point_criteria = []  # Appended in `self.calculate_yield_stresses`
+        self.yield_stresses = []        # Appended in `self.calculate_yield_stresses`
+        self.yield_functions = {}       # Updated in `self.calculate_yield_function_fit`
 
-    def get_principle_yield_stresses(self, equivalent_strain=None, total_shear=None):
+    def __len__(self):
+        return len(self.responses)
 
-        # Specify one yield point type only:
-        if (equivalent_strain is not None and total_shear is not None) or (
-                equivalent_strain is None and total_shear is None):
-            msg = 'Specify exactly one of "equivalent_strain" and "total_shear".'
-            raise ValueError(msg)
+    @init_yield_point_criteria
+    def calculate_yield_stresses(self, yield_point_criteria):
+        """Calculate and store yield stresses for each load case and the specified
+        yield point criteria.
 
-        if not self.yield_stresses:
-            return None
+        Parameters
+        ----------
+        yield_point_criteria : YieldPointCriterion or dict
+            If a dict, it must be a dict of keyword arguments that can be used to
+            instantiate a YieldPointCriterion object.
 
-        msg = 'Yield point {} has not been calculated.'
-        if equivalent_strain is not None:
-            yld_point = ('equivalent_strain', equivalent_strain)
-            if yld_point not in self.yield_stresses:
-                raise ValueError(msg.format(yld_point))
+        """
 
-        elif total_shear is not None:
-            yld_point = ('total_shear', total_shear)
-            if yld_point not in self.yield_stresses:
-                raise ValueError(msg.format(yld_point))
+        yield_stresses = [{'values': [], 'response_idx': []}
+                          for _ in yield_point_criteria.values]
 
-        principals = np.linalg.eigvals(self.yield_stresses[yld_point])
-        principals = np.sort(principals, axis=1)[:, ::-1]
+        for resp_idx, resp_i in enumerate(self.responses):
 
-        return principals
+            yld_stresses_i, vals_idx_i = resp_i.get_yield_stress(yield_point_criteria)
 
-    def add_yield_function_fit(self, yield_function, yield_points=None, **kwargs):
-        """Perform a fit of the stress data to a yield function.
+            for val_idx in vals_idx_i:
+                yield_stresses[val_idx]['values'].append(yld_stresses_i[val_idx])
+                yield_stresses[val_idx]['response_idx'].append(resp_idx)
+
+        for i in yield_stresses:
+            i['values'] = np.array(i['values'])
+
+        self.yield_stresses.append(yield_stresses)
+        self.yield_point_criteria.append(yield_point_criteria)
+
+    def _validate_yield_function_parameters(self, yield_function, yield_point_criteria,
+                                            uniaxial_response, **kwargs):
+
+        uniaxial_eq_stresses = None
+        if 'equivalent_stress' in yield_function.PARAMETERS:
+
+            if 'equivalent_stress' not in kwargs:
+
+                if uniaxial_response is not None:
+                    # equivalent stress is calculated as the yield stress in the
+                    # uniaxial response, for a given specified yield point:
+
+                    if not isinstance(uniaxial_response, LoadResponse):
+                        raise TypeError('`uniaxial_response` must be a LoadResponse')
+
+                    if not uniaxial_response.is_uniaxial(tol=1e-3):
+                        msg = ('Specified `uniaxial_response` does not appear to be '
+                               'uniaxial.')
+                        raise ValueError(msg)
+
+                        princ_stress, _ = uniaxial_response.get_principal_yield_stress(
+                            yield_point_criteria)
+
+                        if len(princ_stress) != len(yield_point_criteria):
+                            msg = ('Yield point not reached within uniaxial response.')
+                            raise ValueError(msg)
+
+                        # Turn into scalars:
+                        uniaxial_eq_stresses = [i[0] for i in princ_stress]
+
+        else:
+
+            msg = (f'The yield function {yield_function.__name__} does not require '
+                   'an equivalent stress parameter, so `{}` is not required.')
+            if uniaxial_response is not None:
+                raise ValueError(msg.format('uniaxial_response'))
+            if kwargs.get('equivalent_stress') is not None:
+                raise ValueError(msg.format('equivalent_stress'))
+
+        kwargs_split = []
+        for idx, i in enumerate(yield_point_criteria.values):
+            kwargs_i = copy.deepcopy(kwargs)
+            if uniaxial_eq_stresses:
+                kwargs_i.update({
+                    'equivalent_stress': uniaxial_eq_stresses[idx]
+                })
+            kwargs_split.append(kwargs_i)
+
+        return kwargs_split
+
+    @at_most_one_of('equivalent_stress', 'uniaxial_response')
+    def fit_yield_function(self, yield_function, equivalent_strain=None,
+                           uniaxial_response=None, **kwargs):
+        """Perform a fit to a yield function of all computed yield stresses.
 
         Parameters
         ----------
         yield_function : str or YieldFunction class
             The yield function to fit. Available yield functions can be displayed using: 
-                `from formable import yield_functions;`
-                `print(yield_functions.AVAILABLE_YIELD_FUNCTIONS)`
-        yield_points : list of tuple of (str, number), optional
-            List of yield point definitions at which to fit the yield function. A yield
-            point definition as two parts: the first is the type of yield point. This
-            must be one of "equivalent_strain" or "total_shear". The second is the value
-            of this quantity at which we are to consider yield to occur. If `None`, fit to
-            any yield stresses already computed.
+                `from formable import AVAILABLE_YIELD_FUNCTIONS`
+                `print(AVAILABLE_YIELD_FUNCTIONS)`
+
         kwargs : dict
             Any yield function parameters to be fixed during the fit can be passed as
             additional keyword arguments.
@@ -216,105 +346,43 @@ class LoadResponseSet(object):
         elif not isinstance(yield_function, YieldFunction):
             raise TypeError(msg)
 
-        # Compute yield stresses for any yield points for which stresses have not been
-        # calculated:
-        to_add = []
-        if yield_points:
-            to_add = list(set(self.yield_stresses.keys()) - set(yield_points))
-            if to_add:
-                self.compute_yield_stresses(to_add)
+        yld_func_name = yield_function.__name__
+        if yld_func_name not in self.yield_functions:
+            self.yield_functions.update({yld_func_name: []})
 
-        yield_points = (yield_points or []) + list(self.yield_stresses.keys())
+        for ypc_idx, ypc in enumerate(self.yield_point_criteria):
 
-        if not self.yield_stresses:
-            msg = 'Specify some yield points at which to fit the yield function.'
-            raise ValueError(msg)
+            kwargs = self._validate_yield_function_parameters(
+                yield_function, ypc, uniaxial_response, **kwargs)
 
-        for yld_point in yield_points:
+            yld_func_list = []
+            for ypc_val_idx, yld_stress in enumerate(self.yield_stresses[ypc_idx]):
 
-            yld_stress = self.yield_stresses[yld_point]
+                # Perform fit:
+                yld_func_obj = yield_function.from_fit(yld_stress, **kwargs[ypc_val_idx])
+                yld_func_list.append(yld_func_obj)
 
-            if 'equivalent_stress' in yield_function.PARAMETERS:
-                if 'equivalent_stress' not in kwargs:
-                    kwargs.update({
-                        'equivalent_stress': self.uniaxial_yield_stress[yld_point]
-                    })
+            self.yield_functions[yld_func_name].append(yld_func_list)
 
-            # Fit:
-            yld_func_obj = yield_function.from_fit(yld_stress, **kwargs)
-
-            # Store the fitted yield function according to the "yield point" definition:
-            yld_func_name = yield_function.__name__
-            if yld_func_name not in self.yield_functions:
-                self.yield_functions.update({yld_func_name: {}})
-
-            self.yield_functions[yld_func_name][yld_point] = yld_func_obj
-
-    def _get_uniaxial_yield_data(self, yield_point, yield_point_type='total_shear'):
-
-        if yield_point_type not in ['total_shear', 'equivalent_strain']:
-            msg = (f'yield_point_type` must be either "total_shear" or '
-                   f'"equivalent_strain" not "{yield_point_type}".')
-            raise ValueError(msg)
-
-        yield_point_col_name_opts = {
-            'total_shear': 'totalshear',
-            'equivalent_strain': 'mises_ln_v__',
-        }
-        yield_point_col_name = yield_point_col_name_opts[yield_point_type]
-
-        resp = self.uniaxial_response
-        yield_stress = resp.get_yield_stress(yield_point, yield_point_col_name)
-
-        return yield_stress[2, 2]
-
-    def _get_yield_data(self, yield_point, yield_point_type='total_shear'):
-        """Get yield point data."""
-
-        if yield_point_type not in ['total_shear', 'equivalent_strain']:
-            msg = (f'yield_point_type` must be either "total_shear" or '
-                   f'"equivalent_strain" not "{yield_point_type}".')
-            raise ValueError(msg)
-
-        yield_point_col_name_opts = {
-            'total_shear': 'totalshear',
-            'equivalent_strain': 'mises_ln_v__',
-        }
-        yield_point_col_name = yield_point_col_name_opts[yield_point_type]
-
-        yield_stress = []
-        skipped_responses = []
-        for idx, resp in enumerate(self.responses):
-
-            if not resp.validate('cauchy', yield_point_col_name):
-                continue
-            try:
-                ys_i = resp.get_yield_stress(yield_point, yield_point_col_name)
-                yield_stress.append(ys_i)
-            except IndexError:
-                skipped_responses.append(idx)
-
-        yield_point_type_fmt = f'{yield_point_type:>20s}'
-        skipped_fmt = f'{len(skipped_responses)}/{len(self.responses)}'
-        print(f'Yield point: {yield_point}, {yield_point_type_fmt}; '
-              f' {skipped_fmt:>7s} responses skipped.')
-
-        return np.array(yield_stress)
-
-    def show_yield_functions_3D(self, yield_point, normalise=True, resolution=DEF_3D_RES,
-                                equivalent_stress=None, min_stress=None, max_stress=None,
-                                show_axes=True, planes=None, backend='plotly'):
+    def show_yield_functions_3D(self, equivalent_strain=None, normalise=True,
+                                resolution=DEF_3D_RES, equivalent_stress=None,
+                                min_stress=None, max_stress=None, show_axes=True,
+                                planes=None, backend='plotly', **kwargs):
         'Visualise all fitted yield functions and data in 3D.'
 
-        # TODO: pass multiple stress states and equivalent stresses based on all fitted
-        # yield points?
+        _, yield_point_type, yield_point_value = kwargs['yield_criteria']
+        yield_point_tup = (yield_point_type, yield_point_value)
+
+        # TODO: pass flatten yield functions and stress states lists into 1D
+        # yield functions need to have a yield point criteria associated with them (maybe
+        # just as a formatted string) so it can appear in the legend.
 
         if yield_point not in self.yield_stresses:
             msg = 'Yield point {} has not been fitted.'
             raise ValueError(msg.format(yield_point))
 
         yld_point_dct = {yield_point[0]: yield_point[1]}
-        stress_states = self.get_principle_yield_stresses(**yld_point_dct)
+        stress_states = self.get_principal_yield_stresses(**yld_point_dct)
         yield_functions = [i[yield_point] for i in self.yield_functions.values()]
 
         return YieldFunction.compare_3D(
@@ -344,7 +412,7 @@ class LoadResponseSet(object):
             raise ValueError(msg.format(yield_point))
 
         yld_point_dct = {yield_point[0]: yield_point[1]}
-        stress_states = self.get_principle_yield_stresses(**yld_point_dct)
+        stress_states = self.get_principal_yield_stresses(**yld_point_dct)
         yield_functions = [i[yield_point] for i in self.yield_functions.values()]
 
         return YieldFunction.compare_2D(
