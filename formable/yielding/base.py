@@ -172,7 +172,6 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def get_parameters(self, formatted=False, format_type='unicode'):
         'Get a dict of the parameters defining this yield surface.'
 
-        # out = {k: v for k, v in self.__dict__.items() if not k.startswith('__')}
         out = {k: getattr(self, k) for k in self.PARAMETERS}
 
         if (formatted and self.FORMATTED_PARAMETER_NAMES and
