@@ -232,6 +232,12 @@ class LoadResponseSet(object):
                     yield_stress_dict['response_idx'].append(resp_idx)
 
             yield_stress_dict['values'] = np.array(yield_stress_dict['values'])
+
+            if not len(yield_stress_dict['values']):
+                msg = (f'No yield stresses were found for yield point criteria '
+                       f'value {yield_point_val}.')
+                raise ValueError(msg)
+
             self.yield_stresses.append(yield_stress_dict)
 
         self.yield_point_criteria.append(yield_point_criteria)
