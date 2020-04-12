@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/formable.svg)](https://badge.fury.io/py/formable)
+
 `formable` provides tools for formability analysis in materials science.
 
 ## Installation
