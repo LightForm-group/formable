@@ -507,6 +507,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     'mode': 'markers',
                     'marker': {
                         'size': 3,
+                        'color': 'gray',
+                        'opacity': 0.5,
                     },
                     'name': 'Contour grid',
                 },
