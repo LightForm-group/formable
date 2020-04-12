@@ -82,11 +82,6 @@ class LoadResponse(object):
         return ', '.join(['"{}"'.format(i) for i in self.ALLOWED_DATA])
 
     @property
-    def allowed_yield_point_types_fmt(self):
-        'Get a comma-separated list of allowed incremental data.'
-        return ', '.join(['"{}"'.format(i) for i in YIELD_POINT_FUNC_MAP])
-
-    @property
     def true_stress(self):
         return self._true_stress
 

@@ -3,40 +3,6 @@
 import functools
 
 
-def yield_point_type_method(func):
-    """Function used to decorate functions for exactly one yield point value should be
-    passed as a keyword argument. This wrapper adds to kwargs the yield point type,
-    yield point value, and the strain values associated with the yield point type."""
-
-    @functools.wraps(func)
-    def wrapped(self, *args, **kwargs):
-
-        # Check that only one `yield_point_type` is specified:
-        specified = list(set(self.ALLOWED_YIELD_POINT_TYPES.keys()) & set(kwargs.keys()))
-
-        if len(specified) == 0 or len(specified) > 1:
-            msg = ('Specify exactly one yield point type and its value as a keyword '
-                   'argument. Allowed yield point types are: {}')
-            raise ValueError(msg.format(self.allowed_yield_point_types_fmt))
-
-        if 'yield_criteria' not in kwargs:
-
-            yield_point_type = specified[0]
-            yield_point_value = kwargs[yield_point_type]
-            strain_values = getattr(self, yield_point_type, None)
-            if strain_values is None:
-                msg = ('Strain data associated with yield point type "{}" not found.')
-                raise ValueError(msg.format(yield_point_type))
-
-            kwargs.update({
-                'yield_criteria': (strain_values, yield_point_type, yield_point_value),
-            })
-
-        return func(self, *args, **kwargs)
-
-    return wrapped
-
-
 def requires(incremental_data_name):
 
     def requires_wrapped(func):
