@@ -131,6 +131,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
         else:
 
+            if len(fitting_param_names) > len(stress_states):
+                msg = (f'Insufficient number of stress states ({len(stress_states)}) to '
+                       f'fit yield function "{cls.__name__}" with '
+                       f'{len(fitting_param_names)} fitting parameters.')
+                raise ValueError(msg)
+
             # Set something sensible for the initial equivalent stress, if it is a
             # fitting parameter, and not given an initial guess:
             if ('equivalent_stress' in fitting_param_names and
