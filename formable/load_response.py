@@ -165,9 +165,6 @@ class LoadResponse(object):
         # Principal values are ordered largest to smallest, so check the first is much
         # larger than the other two:
         normed = princ_stress / princ_stress[0]
-
-        print('normed:\n{}\n'.format(normed))
-
         if (abs(normed[1]) - tol) <= 0 and (abs(normed[2]) - tol) <= 0:
             return True
         else:
