@@ -531,13 +531,25 @@ class YieldFunction(metaclass=abc.ABCMeta):
         annot_font = {
             'size': 14,
         }
+        if equivalent_stress:
+            fig_eq_stress = [equivalent_stress]
+        else:
+            fig_eq_stress = [getattr(i, 'equivalent_stress') for i in yield_functions]
 
-        fig_eq_stress = equivalent_stress or getattr(yld_func, 'equivalent_stress')
-        if fig_eq_stress:
-            fig_eq_stress /= 1e6
+        if any(fig_eq_stress):
+            fig_eq_stress = [i / 1e6 for i in fig_eq_stress if i]
+            fig_eq_stress_list = []
+            for i in fig_eq_stress:
+                if i:
+                    fig_eq_stress_list.append(f'{i:.0f} MPa')
+                else:
+                    fig_eq_stress_list.append('n/a')
+            fig_eq_stress_fmt = ', '.join(fig_eq_stress_list)
+            if len(fig_eq_stress_list) > 1:
+                fig_eq_stress_fmt = f'[{fig_eq_stress_fmt}]'
+
             eq_stress_annot = {
-                'text': 'Equivalent stress, σ<sub>0</sub> = {:.0f} MPa'.format(
-                    fig_eq_stress),
+                'text': f'Equivalent stress, σ<sub>0</sub> = {fig_eq_stress_fmt}',
                 'font': annot_font,
                 'showarrow': False,
                 'x': 0.04,
