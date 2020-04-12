@@ -435,6 +435,6 @@ class LoadResponseSet(object):
             min_stress=min_stress,
             max_stress=max_stress,
             stress_states=yld_stresses,
-            up=None,
-            show_contour_grid=False,
+            up=up,
+            show_contour_grid=show_contour_grid,
         )
