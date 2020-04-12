@@ -49,7 +49,7 @@ setup(
         'itkwidgets',  # for pyvista in Jupyter notebooks
     ],
     project_urls={
-        'Github': 'URL',
+        'Github': 'https://github.com/LightForm-group/formable',
     },
     classifiers=[
         'Development Status :: 4 - Beta',
