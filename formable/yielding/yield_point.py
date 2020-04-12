@@ -89,10 +89,11 @@ class YieldPointCriteria(object):
                 f'source={self.source!r})')
 
     def get_formatted(self, values_idx=None):
-        if values_idx > (len(self) - 1):
-            msg = (f'YieldPointCriteria has only {len(self)} values; cannot '
-                   f'format `values_idx={values_idx}`.')
-            raise IndexError(msg)
+        if values_idx:
+            if values_idx > (len(self) - 1):
+                msg = (f'YieldPointCriteria has only {len(self)} value(s); cannot '
+                       f'format `values_idx={values_idx}`.')
+                raise IndexError(msg)
         if values_idx is None:
             return f'{self.threshold} = {self.values}'
         else:
@@ -106,46 +107,61 @@ class YieldPointCriteria(object):
             Incremental data used as the source data to determine the yield point.
         stress_data : ndarray of shape (N, 3, 3)
             Stress tensors from which a yield stress can be calculated
+        value_idx : int, optional
+            If specified, the yield stress for only this value of the yield point criteria
+            will be calculated. If not specified, yield stresses for all yield point
+            criteria values will be calculated.
 
         Returns
         -------
-        yield_stress : ndarray of shape (M, 3, 3)
+        yield_stress : ndarray of float of shape (M, 3, 3) or (3, 3)
             Yield stress tensors, one for each of M yield point criteria values for which
             the yield stress was successfully calculated. M therefore ranges from 0 to
-            the number of values in the yield point criteria.
-        value_idx : int or list of int
-            Indices of values for which the yield stress was successfully calculated.
+            the number of values in the yield point criteria. If `value_idx` is specified
+            and the yield stress is successfully calculated, the shape will be (3, 3).
+        good_idx : ndarray of int of shape (M,)
+            Indices of the M values for which the yield stress was successfully
+            calculated. If none were successfully calculated, this list will be empty.
 
         """
 
         func = self.YIELD_POINT_FUNC_MAP[(self.source, self.threshold)]
 
         if value_idx is None:
-            value_idx = list(range(len(self)))
-        value_idx = value_idx if isinstance(value_idx, list) else [value_idx]
+            value_idx_list = list(range(len(self)))
+        else:
+            value_idx_list = [value_idx]
 
-        good_value_idx = []
+        good_idx = []
         yield_stress = []
-        for idx, value in zip(value_idx, self.values[value_idx]):
+
+        for value_idx_i in value_idx_list:
+            value = self.values[value_idx_i]
             try:
                 yld_str_i = func(source_data, value, stress_data, **self.kwargs)
             except YieldPointUnsatisfiedError:
                 continue
 
-            good_value_idx.append(idx)
+            good_idx.append(value_idx_i)
             yield_stress.append(yld_str_i)
 
-        return np.array(yield_stress), good_value_idx
+        yield_stress = np.array(yield_stress).reshape(-1, 3, 3)
+        good_idx = np.array(good_idx)
+
+        if (value_idx is not None) and yield_stress.size:
+            yield_stress = yield_stress[0]
+
+        return yield_stress, good_idx
 
 
 def init_yield_point_criteria(func):
 
     @functools.wraps(func)
-    def wrapped(self, yield_point_criteria, **kwargs):
+    def wrapped(self, yield_point_criteria, *args, **kwargs):
 
         if not isinstance(yield_point_criteria, YieldPointCriteria):
             yield_point_criteria = YieldPointCriteria(**yield_point_criteria)
 
-        return func(self, yield_point_criteria, **kwargs)
+        return func(self, yield_point_criteria, *args, **kwargs)
 
     return wrapped

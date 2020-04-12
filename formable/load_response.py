@@ -115,19 +115,20 @@ class LoadResponse(object):
         -------
         yield_stress : ndarray of shape (M, 3, 3)
             Yield stress tensors, one for each of M yield point criteria values.
-        good_value_idx : list of int
-            Indices of values for which the yield stress was successfully calculated.
+        good_idx : list of int
+            Indices of yield point criteria values for which the yield stress was
+            successfully calculated.
 
         """
 
         source_dat = getattr(self, yield_point_criteria.source)
-        yield_stress, good_value_idx = yield_point_criteria.get_yield_stress(
+        yield_stress, good_idx = yield_point_criteria.get_yield_stress(
             source_dat, self.true_stress, value_idx=value_idx)
 
-        return yield_stress, good_value_idx
+        return yield_stress, good_idx
 
     @init_yield_point_criteria
-    def get_principal_yield_stress(self, yield_point_criteria):
+    def get_principal_yield_stress(self, yield_point_criteria, value_idx=None):
         """Find the principal yield stresses associated with a yield point criteria.
 
         Parmeters
@@ -146,9 +147,14 @@ class LoadResponse(object):
 
         """
 
-        yld_stress = self.get_yield_stress(yield_point_criteria)
-        yld_stress_principle, values_idx = get_principal_values(yld_stress)
-        return yld_stress_principle, values_idx
+        yld_stress, good_idx = self.get_yield_stress(yield_point_criteria, value_idx)
+
+        if yld_stress.shape:
+            yld_stress_principle = get_principal_values(yld_stress)
+        else:
+            yld_stress_principle = yld_stress
+
+        return yld_stress_principle, good_idx
 
     @requires('true_stress')
     def is_uniaxial(self, increment=-1, tol=1e-3):
@@ -193,7 +199,7 @@ class LoadResponseSet(object):
 
         self.yield_point_criteria = []  # Appended in `self.calculate_yield_stresses`
         self.yield_stresses = []        # Appended in `self.calculate_yield_stresses`
-        self.yield_functions = {}       # Updated in `self.calculate_yield_function_fit`
+        self.yield_functions = []       # Appended in `self.calculate_yield_function_fit`
 
     def __len__(self):
         return len(self.responses)
@@ -211,27 +217,36 @@ class LoadResponseSet(object):
 
         """
 
-        yield_stresses = [{'values': [], 'response_idx': []}
-                          for _ in yield_point_criteria.values]
+        for ypv_idx, yield_point_val in enumerate(yield_point_criteria.values):
 
-        for resp_idx, resp_i in enumerate(self.responses):
+            yield_stress_dict = {
+                'YPC_idx': len(self.yield_point_criteria),
+                'YPC_value_idx': ypv_idx,
+                'values': [],
+                'response_idx': [],
+            }
 
-            yld_stresses_i, vals_idx_i = resp_i.get_yield_stress(yield_point_criteria)
+            for resp_idx, resp_i in enumerate(self.responses):
 
-            for val_idx in vals_idx_i:
-                yield_stresses[val_idx]['values'].append(yld_stresses_i[val_idx])
-                yield_stresses[val_idx]['response_idx'].append(resp_idx)
+                val, _ = resp_i.get_yield_stress(yield_point_criteria, value_idx=ypv_idx)
 
-        for i in yield_stresses:
-            i['values'] = np.array(i['values'])
+                if val.size:
+                    yield_stress_dict['values'].append(val)
+                    yield_stress_dict['response_idx'].append(resp_idx)
 
-        self.yield_stresses.append(yield_stresses)
+            yield_stress_dict['values'] = np.array(yield_stress_dict['values'])
+            self.yield_stresses.append(yield_stress_dict)
+
         self.yield_point_criteria.append(yield_point_criteria)
 
-    def _validate_yield_function_parameters(self, yield_function, yield_point_criteria,
+    def _validate_yield_function_parameters(self, yield_function,
+                                            yield_point_criteria_idx,
+                                            yield_point_criteria_value_idx,
                                             uniaxial_response, **kwargs):
 
-        uniaxial_eq_stresses = None
+        ypc = self.yield_point_criteria[yield_point_criteria_idx]
+
+        uniaxial_eq_stress = None
         if 'equivalent_stress' in yield_function.PARAMETERS:
 
             if 'equivalent_stress' not in kwargs:
@@ -249,14 +264,14 @@ class LoadResponseSet(object):
                         raise ValueError(msg)
 
                         princ_stress, _ = uniaxial_response.get_principal_yield_stress(
-                            yield_point_criteria)
+                            ypc, value_idx=yield_point_criteria_value_idx)
 
-                        if len(princ_stress) != len(yield_point_criteria):
+                        if not princ_stress.size:
                             msg = ('Yield point not reached within uniaxial response.')
                             raise ValueError(msg)
 
                         # Turn into scalars:
-                        uniaxial_eq_stresses = [i[0] for i in princ_stress]
+                        uniaxial_eq_stress = princ_stress[0]
 
         else:
 
@@ -267,20 +282,17 @@ class LoadResponseSet(object):
             if kwargs.get('equivalent_stress') is not None:
                 raise ValueError(msg.format('equivalent_stress'))
 
-        kwargs_split = []
-        for idx, i in enumerate(yield_point_criteria.values):
-            kwargs_i = copy.deepcopy(kwargs)
-            if uniaxial_eq_stresses:
-                kwargs_i.update({
-                    'equivalent_stress': uniaxial_eq_stresses[idx]
-                })
-            kwargs_split.append(kwargs_i)
+        kwargs_copy = copy.deepcopy(kwargs)
+        if uniaxial_eq_stress:
+            kwargs_copy.update({
+                'equivalent_stress': uniaxial_eq_stress,
+            })
 
-        return kwargs_split
+        return kwargs_copy
 
     @at_most_one_of('equivalent_stress', 'uniaxial_response')
-    def fit_yield_function(self, yield_function, equivalent_strain=None,
-                           uniaxial_response=None, **kwargs):
+    def fit_yield_function(self, yield_function, yield_point_criteria_idx=None,
+                           uniaxial_response=None, initial_params=None, **kwargs):
         """Perform a fit to a yield function of all computed yield stresses.
 
         Parameters
@@ -289,7 +301,13 @@ class LoadResponseSet(object):
             The yield function to fit. Available yield functions can be displayed using: 
                 `from formable import AVAILABLE_YIELD_FUNCTIONS`
                 `print(AVAILABLE_YIELD_FUNCTIONS)`
-
+        yield_point_criteria_idx : list of (list of int of length 2), optional
+            If specified, fit the yield function to only the yield stresses calculated
+            from the specified yield point criteria value. By default, None, in which case
+            the yield function is fitted to all available yield stresses.
+        initial_params : dict, optional
+            Any initial guesses for the fitting parameters. Mutually exclusive with
+            additional keyword arguments passed, which are considered to be fixed.            
         kwargs : dict
             Any yield function parameters to be fixed during the fit can be passed as
             additional keyword arguments.
@@ -309,54 +327,78 @@ class LoadResponseSet(object):
         elif not issubclass(yield_function, YieldFunction):
             raise TypeError(msg)
 
-        yld_func_name = yield_function.__name__
-        if yld_func_name not in self.yield_functions:
-            self.yield_functions.update({yld_func_name: []})
+        if not yield_point_criteria_idx:
+            yield_point_criteria_idx = [
+                [ypc_idx, ypc_val_idx]
+                for ypc_idx, ypc in enumerate(self.yield_point_criteria)
+                for ypc_val_idx in range(len(ypc))
+            ]
 
-        for ypc_idx, ypc in enumerate(self.yield_point_criteria):
+        for ypc_idx, ypc_val_idx in yield_point_criteria_idx:
 
-            kwargs = self._validate_yield_function_parameters(
-                yield_function, ypc, uniaxial_response, **kwargs)
+            yield_stress = None
+            yield_stress_idx = None
+            for ys_idx, ys in enumerate(self.yield_stresses):
+                if ys['YPC_idx'] == ypc_idx and ys['YPC_value_idx'] == ypc_val_idx:
+                    yield_stress = ys['values']
+                    yield_stress_idx = ys_idx
+                    break
 
-            yld_func_list = []
-            for ypc_val_idx, yld_stress in enumerate(self.yield_stresses[ypc_idx]):
+            if yield_stress is None:
+                msg = (f'No yield stress found corresponding to '
+                       f'`yield_point_criteria_idx={yield_point_criteria_idx}`.')
+                raise ValueError(msg)
 
-                # Perform fit:
-                yld_func_obj = yield_function.from_fit(
-                    yld_stress['values'], **kwargs[ypc_val_idx]
-                )
-                yld_func_list.append(yld_func_obj)
+            yield_func_dict = {
+                'YPC_idx': ypc_idx,
+                'YPC_value_idx': ypc_val_idx,
+                'yield_stress_idx': yield_stress_idx,
+                'yield_function': None,
+            }
+            updated_kwargs = self._validate_yield_function_parameters(
+                yield_function,
+                ypc_idx,
+                ypc_val_idx,
+                uniaxial_response,
+                **kwargs
+            )
 
-            self.yield_functions[yld_func_name].append(yld_func_list)
+            # Perform fit:
+            yld_func_obj = yield_function.from_fit(
+                yield_stress,
+                initial_params=initial_params,
+                **updated_kwargs
+            )
+
+            ypc = self.yield_point_criteria[ypc_idx]
+            yld_func_obj.yield_point = ypc.get_formatted(values_idx=ypc_val_idx)
+            yield_func_dict['yield_function'] = yld_func_obj
+
+            self.yield_functions.append(yield_func_dict)
 
     def remove_yield_function_fits(self):
         'Remove all yield function fits'
 
-        self.yield_functions = {}
+        self.yield_functions = []
 
-    def show_yield_functions_3D(self, equivalent_strain=None, normalise=True,
-                                resolution=DEF_3D_RES, equivalent_stress=None,
-                                min_stress=None, max_stress=None, show_axes=True,
-                                planes=None, backend='plotly', **kwargs):
+    def show_yield_functions_3D(self, normalise=True, resolution=DEF_3D_RES,
+                                equivalent_stress=None, min_stress=None, max_stress=None,
+                                show_axes=True, planes=None, backend='plotly'):
         'Visualise all fitted yield functions and data in 3D.'
 
-        _, yield_point_type, yield_point_value = kwargs['yield_criteria']
-        yield_point_tup = (yield_point_type, yield_point_value)
+        if not self.yield_functions:
+            raise ValueError('No yield functions have been fitted to the load set.')
 
-        # TODO: pass flatten yield functions and stress states lists into 1D
-        # yield functions need to have a yield point criteria associated with them (maybe
-        # just as a formatted string) so it can appear in the legend.
-
-        if yield_point not in self.yield_stresses:
-            msg = 'Yield point {} has not been fitted.'
-            raise ValueError(msg.format(yield_point))
-
-        yld_point_dct = {yield_point[0]: yield_point[1]}
-        stress_states = self.get_principal_yield_stresses(**yld_point_dct)
-        yield_functions = [i[yield_point] for i in self.yield_functions.values()]
+        yld_funcs = []
+        yld_stresses = []
+        for yld_func_dict in self.yield_functions:
+            yld_funcs.append(yld_func_dict['yield_function'])
+            yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]['values']
+            yld_stress_principal = get_principal_values(yld_stress)
+            yld_stresses.append(yld_stress_principal)
 
         return YieldFunction.compare_3D(
-            yield_functions,
+            yld_funcs,
             normalise=normalise,
             resolution=resolution,
             equivalent_stress=equivalent_stress,
@@ -364,7 +406,7 @@ class LoadResponseSet(object):
             max_stress=max_stress,
             show_axes=show_axes,
             planes=planes,
-            stress_states=stress_states,
+            stress_states=yld_stresses,
             backend=backend,
         )
 
@@ -374,26 +416,26 @@ class LoadResponseSet(object):
                                 up=None, show_contour_grid=False):
         'Visualise all fitted yield functions and data in 2D.'
 
-        # TODO: pass multiple stress states and equivalent stresses based on all fitted
-        # yield points?
+        if not self.yield_functions:
+            raise ValueError('No yield functions have been fitted to the load set.')
 
-        if yield_point not in self.yield_stresses:
-            msg = 'Yield point {} has not been fitted.'
-            raise ValueError(msg.format(yield_point))
-
-        yld_point_dct = {yield_point[0]: yield_point[1]}
-        stress_states = self.get_principal_yield_stresses(**yld_point_dct)
-        yield_functions = [i[yield_point] for i in self.yield_functions.values()]
+        yld_funcs = []
+        yld_stresses = []
+        for yld_func_dict in self.yield_functions:
+            yld_funcs.append(yld_func_dict['yield_function'])
+            yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]['values']
+            yld_stress_principal = get_principal_values(yld_stress)
+            yld_stresses.append(yld_stress_principal)
 
         return YieldFunction.compare_2D(
-            yield_functions,
+            yld_funcs,
             plane,
             normalise=normalise,
             resolution=resolution,
             equivalent_stress=equivalent_stress,
             min_stress=min_stress,
             max_stress=max_stress,
-            stress_states=stress_states,
+            stress_states=yld_stresses,
             up=None,
             show_contour_grid=False,
         )
