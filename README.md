@@ -47,7 +47,7 @@ YieldFunction.compare_3D([von_mises, tresca])
 
 If run within a Jupyter environment, this code snippet will generated a 3D visualisation of the yield surfaces in principal stress space:
 
-![yield_function_3D_viz](img/yield_function_3D_viz.gif)
+![yield_function_3D_viz](https://raw.githubusercontent.com/LightForm-group/formable/master/img/yield_function_3D_viz.gif)
 
 To look at a single plane within principal stress space, we can do this:
 
@@ -59,7 +59,7 @@ YieldFunction.compare_2D([von_mises, tresca], plane=[0, 0, 1])
 
 which generates a figure like this:
 
-![yield_function_2D_viz](img/yield_function_2D_viz.png)
+![yield_function_2D_viz](https://raw.githubusercontent.com/LightForm-group/formable/master/img/yield_function_2D_viz.png)
 
 We can choose any plane that intercepts the origin. For instance, we can also look at the π-plane (σ<sub>1</sub> = σ<sub>2</sub> = σ<sub>3</sub>):
 
@@ -71,7 +71,7 @@ YieldFunction.compare_2D([von_mises, tresca], plane=[1, 1, 1])
 
 which generates a figure like this:
 
-![yield_function_2D_viz](img/yield_function_2D_viz_pi_plane.png)
+![yield_function_2D_viz](https://raw.githubusercontent.com/LightForm-group/formable/master/img/yield_function_2D_viz_pi_plane.png)
 
 ### Yield function fitting
 
