@@ -480,6 +480,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
                     color_dim = np.abs(dist) / np.max(np.abs(dist))
 
+                    base_col = DEFAULT_PLOTLY_COLORS[idx]
+                    base_col_rgb = utils.parse_rgb_str(base_col)
+
                     fig_data.append({
                         'type': 'scatter',
                         'x': proj_rot[0],
@@ -491,9 +494,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
                             'color': color_dim,
                             'showscale': False,
                             'colorscale': [
-                                [0,   'rgba(0,0,255,1)'],
-                                [0.2, 'rgba(0,0,255,0.2)'],
-                                [1,   'rgba(0,0,255,0)'],
+                                [0,   utils.format_rgba(*base_col_rgb, 1.0)],
+                                [0.2, utils.format_rgba(*base_col_rgb, 0.2)],
+                                [1,   utils.format_rgba(*base_col_rgb, 0.0)],
                             ],
                         },
                     })

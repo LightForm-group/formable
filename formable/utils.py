@@ -37,7 +37,6 @@ def yield_point_type_method(func):
     return wrapped
 
 
-
 def requires(incremental_data_name):
 
     def requires_wrapped(func):
@@ -91,3 +90,13 @@ def format_axis_label(direction, basis_labels=['x', 'y', 'z'], zero_tol=1e-6):
     out_fmt = ' + '.join(out)
 
     return out_fmt
+
+
+def parse_rgb_str(rgb_str):
+    'Get the list of integers in an RGB color string like "rgb(xxx, xxx, xxx)"'
+    return [int(i) for i in rgb_str[4:-1].split(',')]
+
+
+def format_rgba(*rgb_comps, opacity=1):
+    'Get an "rgba(xxx, xxx, xxx, xxx)" string.'
+    return 'rgba({0},{1},{2},{3})'.format(*rgb_comps, opacity)
