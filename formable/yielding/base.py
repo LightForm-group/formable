@@ -78,16 +78,6 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
         pass
 
-    def get_value(self, stress_states):
-
-        value = self.residual(
-            fitting_params=[],
-            stress_states=stress_states,
-            fitting_param_names=[],
-            **self.get_parameters(formatted=False)
-        )
-        return value
-
     @classmethod
     def from_fit(cls, stress_states, initial_params=None, **kwargs):
         """Fit the yield function to yield stress states.
