@@ -263,15 +263,15 @@ class LoadResponseSet(object):
                                'uniaxial.')
                         raise ValueError(msg)
 
-                        princ_stress, _ = uniaxial_response.get_principal_yield_stress(
-                            ypc, value_idx=yield_point_criteria_value_idx)
+                    princ_stress, _ = uniaxial_response.get_principal_yield_stress(
+                        ypc, value_idx=yield_point_criteria_value_idx)
 
-                        if not princ_stress.size:
-                            msg = ('Yield point not reached within uniaxial response.')
-                            raise ValueError(msg)
+                    if not princ_stress.size:
+                        msg = ('Yield point not reached within uniaxial response.')
+                        raise ValueError(msg)
 
-                        # Turn into scalars:
-                        uniaxial_eq_stress = princ_stress[0]
+                    # Turn into scalars:
+                    uniaxial_eq_stress = princ_stress[0]
 
         else:
 
