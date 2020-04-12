@@ -34,7 +34,7 @@ def get_long_description():
 setup(
     name='formable',
     version=get_version(),
-    description=('Computational formability in Python.'),
+    description=('Formability analysis in materials science.'),
     long_description=get_long_description(),
     long_description_content_type='text/markdown',
     author='Adam J. Plowman',
