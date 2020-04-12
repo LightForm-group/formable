@@ -564,7 +564,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         fig = graph_objects.FigureWidget(
             data=fig_data,
             layout={
-                'height': 500,
+                'height': 600,
                 'width': 600,
                 'xaxis': {
                     'scaleanchor': 'y',
@@ -574,6 +574,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     'title': axis_labels['y'],
                 },
                 'annotations': fig_annots,
+                'legend': {
+                    'yanchor': 'top',
+                    'xanchor': 'center',
+                    'y': -0.15,
+                    'x': 0.5,
+                }
             }
         )
 
