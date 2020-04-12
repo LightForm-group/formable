@@ -410,10 +410,9 @@ class LoadResponseSet(object):
             backend=backend,
         )
 
-    def show_yield_functions_2D(self, yield_point, plane, normalise=True,
-                                resolution=DEF_2D_RES, equivalent_stress=None,
-                                min_stress=None, max_stress=None, show_axes=True,
-                                up=None, show_contour_grid=False):
+    def show_yield_functions_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
+                                equivalent_stress=None, min_stress=None, max_stress=None,
+                                show_axes=True, up=None, show_contour_grid=False):
         'Visualise all fitted yield functions and data in 2D.'
 
         if not self.yield_functions:

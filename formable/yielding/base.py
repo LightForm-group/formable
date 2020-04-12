@@ -14,7 +14,7 @@ from plotly import graph_objects
 from plotly.colors import DEFAULT_PLOTLY_COLORS
 from scipy.optimize import least_squares
 
-from formable import utils
+from formable import utils, maths_utils
 
 DEF_3D_RES = 50
 DEF_2D_RES = 100
@@ -191,9 +191,22 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
         Parameters
         ----------
-        yld_funcs : list of YieldFunction    
+        yield_functions : list of YieldFunction
+            List of YieldFunction objects to display. If a given yield function has an
+            attribute `yield_point` assigned, this will be displayed in the legend.
+        stress_states : list of ndarray, optional
+            List of principal stress states to show. If specified, the length of this list
+            must match that of `yield_functions`. In that case, if there are no stress
+            states to show for one of more of the passed yield functions, then those list
+            elements should be `None`.
 
         """
+
+        if stress_states is not None:
+            if len(stress_states) != len(yield_functions):
+                msg = ('If specified, `stress_states` should be a list of equal length '
+                       'to the `yield_functions` list.')
+                raise ValueError(msg)
 
         stress_range = cls._get_multi_plot_stress_range(
             yield_functions=yield_functions,
@@ -215,13 +228,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
             max_stress=max_stress,
         )
 
-        if stress_states is not None:
-            # Order:
-            stress_states = np.sort(stress_states, axis=1)[:, ::-1]
-            if normalise:
-                stress_states = stress_states / eq_stress
-
         if backend == 'pyvista':
+
+            raise NotImplementedError('not yet.')
 
             grid = pv.StructuredGrid(stress_X, stress_Y, stress_Z)
             for yld_func, i in zip(yield_functions, values_all):
@@ -247,6 +256,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
             fig_data = []
 
             for idx, (yld_func, i) in enumerate(zip(yield_functions, values_all)):
+
+                name = f'{idx + 1}. {yld_func.__class__.__name__}'
+                yield_point = getattr(yld_func, 'yield_point')
+                if yield_point:
+                    name += f' ({yield_point})'
+
                 fig_data.append({
                     'type': 'isosurface',
                     'x': stress_X,
@@ -263,7 +278,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     ],
                     'showscale': False,
                     'showlegend': True,
-                    'name': yld_func.__class__.__name__,
+                    'name': name,
                 })
 
             fig_annots = []
@@ -275,7 +290,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     f'σ<sub>3</sub>',
                 ]
                 for idx, plane in enumerate(planes):
-                    plane_coords = utils.get_plane_coords(
+                    plane_coords = maths_utils.get_plane_coords(
                         *plane,
                         side_length=(max_stress - min_stress) / 1.5,
                         resolution=10,
@@ -298,23 +313,33 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     ])
 
             if show_axes:
+                # TODO: `yld_func` is from the above loop:
                 axes_dat, axes_annots = yld_func._get_3D_plot_axes(min_stress, max_stress)
                 fig_data.extend(axes_dat)
                 fig_annots.extend(axes_annots)
 
             if stress_states is not None:
 
-                fig_data.append(
-                    {
-                        'type': 'scatter3d',
-                        'x': stress_states[:, 0],
-                        'y': stress_states[:, 1],
-                        'z': stress_states[:, 2],
-                        'name': 'Stress data',
-                        'legendgroup': 'Stress data',
-                        'mode': 'markers',
-                    }
-                )
+                for idx, (yld_func, stresses) in enumerate(zip(yield_functions, stress_states)):
+
+                    if stresses is not None:
+
+                        if normalise:
+                            stresses /= eq_stress
+
+                        fig_data.append(
+                            {
+                                'type': 'scatter3d',
+                                'x': stresses[:, 0],
+                                'y': stresses[:, 1],
+                                'z': stresses[:, 2],
+                                'name': f'{idx + 1}. Stress data',
+                                'mode': 'markers',
+                                'marker': {
+                                    'color': DEFAULT_PLOTLY_COLORS[idx],
+                                }
+                            }
+                        )
 
             fig = graph_objects.FigureWidget(
                 data=fig_data,
@@ -353,6 +378,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
                    stress_states=None, up=None, show_contour_grid=False):
         'Visualise multiple yield functions in 2D.'
 
+        if stress_states is not None:
+            if len(stress_states) != len(yield_functions):
+                msg = ('If specified, `stress_states` should be a list of equal length '
+                       'to the `yield_functions` list.')
+                raise ValueError(msg)
+
         stress_range = cls._get_multi_plot_stress_range(
             yield_functions=yield_functions,
             normalise=normalise,
@@ -383,6 +414,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
         fig_data = []
         for idx, (yld_func, i) in enumerate(zip(yield_functions, values_all)):
+
+            name = f'{idx + 1}. {yld_func.__class__.__name__}'
+            yield_point = getattr(yld_func, 'yield_point')
+            if yield_point:
+                name += f' ({yield_point})'
+
             fig_data.append({
                 'type': 'contour',
                 'x': grid_coords_2D[0],
@@ -402,51 +439,54 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 'showscale': False,
                 'showlegend': True,
                 'hoverinfo': 'none',
-                'name': yld_func.__class__.__name__,
+                'name': name,
             })
 
         if stress_states is not None:
-            # Order stress components:
-            stress_states = np.sort(stress_states, axis=1)[:, ::-1]
-            if normalise:
-                stress_states = stress_states / eq_stress
 
-            # TODO: Order stress states by distance to viewer.
+            for idx, (yld_func, stresses) in enumerate(zip(yield_functions, stress_states)):
 
-            # Colour/set opacity for stress states by distance to projection plane:
-            # stress_states shape (N, 3)
-            normal = np.array(plane)
-            normal_unit = normal / np.linalg.norm(normal)
-            dist = np.dot(stress_states, normal_unit)
-            proj = stress_states - (normal_unit * np.dot(stress_states, normal)[:, None])
+                if stresses is not None:
 
-            # Rotate projected states so plane normal is aligned with z-axis
-            basis_full = np.hstack([basis_unit, normal_unit[:, None]])
-            proj_rot = basis_full.T @ proj.T
+                    if normalise:
+                        stresses /= eq_stress
 
-            if not normalise:
-                proj_rot[0:2] /= 1e6
+                    # TODO: Order stress states by distance to viewer.
 
-            color_dim = np.abs(dist) / np.max(np.abs(dist))
+                    # Colour/set opacity for stress states by distance to projection plane:
+                    # stresses shape (N, 3)
+                    normal = np.array(plane)
+                    normal_unit = normal / np.linalg.norm(normal)
+                    dist = np.dot(stresses, normal_unit)
+                    proj = stresses
+                    proj -= (normal_unit * np.dot(stresses, normal)[:, None])
 
-            fig_data.append({
-                'type': 'scatter',
-                'x': proj_rot[0],
-                'y': proj_rot[1],
-                'mode': 'markers',
-                'name': 'Stress data',
-                'hovertext': dist,
-                # 'hoverinfo': '',
-                'marker': {
-                    'color': color_dim,
-                    'showscale': False,
-                    'colorscale': [
-                        [0,   'rgba(0,0,255,1)'],
-                        [0.2, 'rgba(0,0,255,0.2)'],
-                        [1,   'rgba(0,0,255,0)'],
-                    ],
-                },
-            })
+                    # Rotate projected states so plane normal is aligned with z-axis
+                    basis_full = np.hstack([basis_unit, normal_unit[:, None]])
+                    proj_rot = basis_full.T @ proj.T
+
+                    if not normalise:
+                        proj_rot[0:2] /= 1e6
+
+                    color_dim = np.abs(dist) / np.max(np.abs(dist))
+
+                    fig_data.append({
+                        'type': 'scatter',
+                        'x': proj_rot[0],
+                        'y': proj_rot[1],
+                        'mode': 'markers',
+                        'name': f'{idx+ 1}. Stress data',
+                        'hovertext': dist,
+                        'marker': {
+                            'color': color_dim,
+                            'showscale': False,
+                            'colorscale': [
+                                [0,   'rgba(0,0,255,1)'],
+                                [0.2, 'rgba(0,0,255,0.2)'],
+                                [1,   'rgba(0,0,255,0)'],
+                            ],
+                        },
+                    })
 
         if show_contour_grid:
             fig_data.append(
@@ -636,7 +676,6 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 'y': [0, 0],
                 'z': [0, 0],
                 **axis_lines,
-                'showlegend': True,
             },
             {
                 'type': 'scatter3d',
@@ -751,7 +790,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
             max_stress = stress_range['max_stress']
             equivalent_stress = stress_range['eq_stress']
 
-        plane_coords = utils.get_plane_coords(
+        plane_coords = maths_utils.get_plane_coords(
             *plane,
             side_length=(max_stress - min_stress) / 1.5,
             resolution=resolution,
