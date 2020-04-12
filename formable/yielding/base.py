@@ -274,7 +274,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
             for idx, (yld_func, i) in enumerate(zip(yield_functions, values_all)):
 
                 name = f'{idx + 1}. {yld_func.__class__.__name__}'
-                yield_point = getattr(yld_func, 'yield_point')
+                yield_point = getattr(yld_func, 'yield_point', None)
                 if yield_point:
                     name += f' ({yield_point})'
 
@@ -432,7 +432,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         for idx, (yld_func, i) in enumerate(zip(yield_functions, values_all)):
 
             name = f'{idx + 1}. {yld_func.__class__.__name__}'
-            yield_point = getattr(yld_func, 'yield_point')
+            yield_point = getattr(yld_func, 'yield_point', None)
             if yield_point:
                 name += f' ({yield_point})'
 
@@ -540,7 +540,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
         if equivalent_stress:
             fig_eq_stress = [equivalent_stress]
         else:
-            fig_eq_stress = [getattr(i, 'equivalent_stress') for i in yield_functions]
+            fig_eq_stress = [getattr(i, 'equivalent_stress', None)
+                             for i in yield_functions]
 
         if any(fig_eq_stress):
             fig_eq_stress = [i / 1e6 for i in fig_eq_stress if i]
