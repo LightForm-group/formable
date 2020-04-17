@@ -448,7 +448,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     'coloring': 'none',
                 },
                 'line': {
-                    # Resolution must be high enough to accurately portray curvature.
+                    # Resolution must be high enough to accurately portray curvature;
+                    # so don't rely on smoothing!
                     'smoothing': 0,
                     'color': DEFAULT_PLOTLY_COLORS[idx],
                 },
