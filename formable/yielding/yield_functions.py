@@ -717,8 +717,7 @@ class Dummy2DYieldFunction(YieldFunction):
     @yield_function_fitter
     def residual(fitting_params, stress_states, fitting_param_names, **kwargs):
 
-        # princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
-        princ = np.linalg.eigvals(stress_states)
+        princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
 
         # r = 10.4:
         # value = (np.sqrt(np.abs(princ[:, 0]**2 + princ[:, 1]**2)) / kwargs['radius']) - 1
