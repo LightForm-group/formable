@@ -83,9 +83,9 @@ def expand_idx_array(arr, max_idx):
 
     Returns
     -------
-    full : MaskedArray of shape (max_idx,)
+    full : MaskedArray of shape (`max_idx` + 1,)
         Masked array where unmasked values at position i have value i.
-    idx : MaskedArray of shape (max_idx,)
+    idx : MaskedArray of shape (`max_idx` + 1,)
         Masked array giving the positions in the original array of the
         elements in `full`.
 
