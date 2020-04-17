@@ -89,7 +89,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         return value
 
     @classmethod
-    def from_fit(cls, stress_states, initial_params=None, **kwargs):
+    def from_fit(cls, stress_states, initial_params=None, force_fit=False, **kwargs):
         """Fit the yield function to yield stress states.
 
         Parameters
@@ -98,6 +98,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
         initial_params : dict 
             Any initial guesses for the fitting parameters. Mutually exclusive with
             additional keyword arguments passed, which are considered to be fixed.
+        force_fit : bool, optional
+            If False, do not fit if there is insufficient input data. False by default.
         kwargs : dict
             Additional parameters passed to this method will be fixed during the fit.
 
@@ -131,7 +133,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
         else:
 
-            if len(fitting_param_names) > len(stress_states):
+            if len(fitting_param_names) > len(stress_states) and not force_fit:
                 msg = (f'Insufficient number of stress states ({len(stress_states)}) to '
                        f'fit yield function "{cls.__name__}" with '
                        f'{len(fitting_param_names)} fitting parameters.')
