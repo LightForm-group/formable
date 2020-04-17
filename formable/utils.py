@@ -1,6 +1,7 @@
 """`formable.utilities.py`"""
 
 import functools
+import numpy as np
 
 
 def requires(incremental_data_name):
@@ -66,3 +67,42 @@ def parse_rgb_str(rgb_str):
 def format_rgba(*rgb_comps, opacity=1):
     'Get an "rgba(xxx, xxx, xxx, xxx)" string.'
     return 'rgba({0},{1},{2},{3})'.format(*rgb_comps, opacity)
+
+
+def expand_idx_array(arr, max_idx):
+    """Expand an index array into a masked array where an element at position
+    i has value i, for values drawn from the original array, and all other
+    elements are masked.
+
+    Parameters
+    ----------
+    arr : ndarray of shape (N,)
+    max_idx : int
+        Maximum index to consider. The output arrays will
+        have length `max_idx` + 1.
+
+    Returns
+    -------
+    full : MaskedArray of shape (max_idx,)
+        Masked array where unmasked values at position i have value i.
+    idx : MaskedArray of shape (max_idx,)
+        Masked array giving the positions in the original array of the
+        elements in `full`.
+
+    Example
+    -------
+    >>> A = np.array([1, 3, 4, 0])
+    >>> full, idx = expand_idx_array(A, max_idx=4)
+    >>> print(full)
+    [0 1 -- 3 4]
+    >>> print(idx)
+    [3 0 -- 1 2]
+
+    """
+
+    full = np.ma.masked_all((max_idx + 1,), dtype=int)
+    idx = np.ma.masked_all((max_idx + 1,), dtype=int)
+    full[arr] = arr
+    idx[arr] = np.arange(len(arr))
+
+    return full, idx

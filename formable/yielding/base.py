@@ -95,7 +95,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         Parameters
         ----------
         stress_states : ndarray of shape (N, 3, 3)
-        initial_params : dict 
+        initial_params : dict
             Any initial guesses for the fitting parameters. Mutually exclusive with
             additional keyword arguments passed, which are considered to be fixed.
         force_fit : bool, optional
@@ -204,7 +204,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
     @classmethod
     def compare_3D(cls, yield_functions, normalise=True, resolution=DEF_3D_RES,
                    equivalent_stress=None, min_stress=None, max_stress=None,
-                   show_axes=True, planes=None, stress_states=None, backend='plotly'):
+                   show_axes=True, planes=None, stress_states=None, backend='plotly',
+                   stress_indices=None, join_stress_states=False):
         """Visualise one or more yield functions in 3D.
 
         Parameters
@@ -224,6 +225,17 @@ class YieldFunction(metaclass=abc.ABCMeta):
             if len(stress_states) != len(yield_functions):
                 msg = ('If specified, `stress_states` should be a list of equal length '
                        'to the `yield_functions` list.')
+                raise ValueError(msg)
+
+            if join_stress_states and not stress_indices:
+                msg = ('If `join_stress_states=True`, `stress_indices` must be specified '
+                       'as a list (of equal length to `stress_states`) of integer '
+                       'indices that determine how the stress states should be '
+                       'connected.')
+                raise ValueError(msg)
+
+            if stress_indices and len(stress_indices) != len(stress_states):
+                msg = '`stress_indices` must have the same length as `stress_states`.'
                 raise ValueError(msg)
 
         stress_range = cls._get_multi_plot_stress_range(
@@ -338,7 +350,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
             if stress_states is not None:
 
-                for idx, (yld_func, stresses) in enumerate(zip(yield_functions, stress_states)):
+                for idx, stresses in enumerate(stress_states):
 
                     if stresses is not None:
 
@@ -358,6 +370,44 @@ class YieldFunction(metaclass=abc.ABCMeta):
                                 }
                             }
                         )
+
+                if join_stress_states:
+                    max_idx = np.max(np.concatenate(stress_indices))
+                    all_idx = [utils.expand_idx_array(i, max_idx) for i in stress_indices]
+
+                    for i_idx, i in enumerate(all_idx[1:], 1):
+
+                        if (stress_states[i_idx] is None or
+                                stress_states[i_idx - 1] is None):
+                            continue
+
+                        A_exp, A_idx = i
+                        B_exp, B_idx = all_idx[i_idx - 1]
+
+                        matching_idx = np.ma.filled(A_exp == B_exp, fill_value=False)
+                        stress_A_idx = A_idx.data[matching_idx]
+                        stress_B_idx = B_idx.data[matching_idx]
+
+                        A = stress_states[i_idx][stress_A_idx]
+                        B = stress_states[i_idx - 1][stress_B_idx]
+
+                        # Lines should go from A to B
+                        xyz = np.zeros((3, A.shape[0] * 3))
+                        xyz[:, 2::3] = np.nan
+                        xyz[:, 0::3] = A.T
+                        xyz[:, 1::3] = B.T
+
+                        fig_data.append({
+                            'type': 'scatter3d',
+                            'x': xyz[0],
+                            'y': xyz[1],
+                            'z': xyz[2],
+                            'mode': 'lines',
+                            'name': f'Stress path ({i_idx})',
+                            'line': {
+                                'color': 'black',
+                            },
+                        })
 
             fig = graph_objects.FigureWidget(
                 data=fig_data,
@@ -393,13 +443,33 @@ class YieldFunction(metaclass=abc.ABCMeta):
     @classmethod
     def compare_2D(cls, yield_functions, plane, normalise=True, resolution=DEF_2D_RES,
                    equivalent_stress=None, min_stress=None, max_stress=None,
-                   stress_states=None, up=None, show_contour_grid=False):
-        'Visualise multiple yield functions in 2D.'
+                   stress_states=None, up=None, show_contour_grid=False,
+                   stress_indices=None, join_stress_states=False):
+        """Visualise multiple yield functions in 2D.
+
+        Parameters
+        ----------
+        join_stress_states : bool, optional
+            If True, stress states corresponding to the same `stress_indices` values will
+            be joined by straight lines. False by default.
+
+        """
 
         if stress_states is not None:
             if len(stress_states) != len(yield_functions):
                 msg = ('If specified, `stress_states` should be a list of equal length '
                        'to the `yield_functions` list.')
+                raise ValueError(msg)
+
+            if join_stress_states and not stress_indices:
+                msg = ('If `join_stress_states=True`, `stress_indices` must be specified '
+                       'as a list (of equal length to `stress_states`) of integer '
+                       'indices that determine how the stress states should be '
+                       'connected.')
+                raise ValueError(msg)
+
+            if stress_indices and len(stress_indices) != len(stress_states):
+                msg = '`stress_indices` must have the same length as `stress_states`.'
                 raise ValueError(msg)
 
         stress_range = cls._get_multi_plot_stress_range(
@@ -463,10 +533,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
         if stress_states is not None:
 
-            for idx, (yld_func, stresses) in enumerate(zip(yield_functions, stress_states)):
-
+            proj_stresses = []  # 1 element for each yield_function/stress_state
+            for stresses in stress_states:
                 if stresses is not None:
-
                     if normalise:
                         stresses /= eq_stress
 
@@ -487,15 +556,24 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     if not normalise:
                         proj_rot[0:2] /= 1e6
 
-                    color_dim = np.abs(dist) / np.max(np.abs(dist))
+                    proj_stresses.append({
+                        'x': proj_rot[0],
+                        'y': proj_rot[1],
+                        'dist': dist
+                    })
+                else:
+                    proj_stresses.append(None)
 
+            for idx, proj in enumerate(proj_stresses):
+                if proj is not None:
+                    color_dim = np.abs(proj['dist']) / np.max(np.abs(proj['dist']))
                     base_col = DEFAULT_PLOTLY_COLORS[idx]
                     base_col_rgb = utils.parse_rgb_str(base_col)
 
                     fig_data.append({
                         'type': 'scatter',
-                        'x': proj_rot[0],
-                        'y': proj_rot[1],
+                        'x': proj['x'],
+                        'y': proj['y'],
                         'mode': 'markers',
                         'name': f'{idx+ 1}. Stress data',
                         'hovertext': dist,
@@ -507,6 +585,55 @@ class YieldFunction(metaclass=abc.ABCMeta):
                                 [0.2, utils.format_rgba(*base_col_rgb, 0.2)],
                                 [1,   utils.format_rgba(*base_col_rgb, 0.0)],
                             ],
+                        },
+                    })
+
+            if join_stress_states:
+                max_idx = np.max(np.concatenate(stress_indices))
+                all_idx = [utils.expand_idx_array(i, max_idx) for i in stress_indices]
+
+                for i_idx, i in enumerate(all_idx[1:], 1):
+
+                    if proj_stresses[i_idx] is None or proj_stresses[i_idx - 1] is None:
+                        continue
+
+                    A_exp, A_idx = i
+                    B_exp, B_idx = all_idx[i_idx - 1]
+
+                    matching_idx = np.ma.filled(A_exp == B_exp, fill_value=False)
+                    stress_A_idx = A_idx.data[matching_idx]
+                    stress_B_idx = B_idx.data[matching_idx]
+
+                    A_x = proj_stresses[i_idx]['x'][stress_A_idx]
+                    A_y = proj_stresses[i_idx]['y'][stress_A_idx]
+                    B_x = proj_stresses[i_idx - 1]['x'][stress_B_idx]
+                    B_y = proj_stresses[i_idx - 1]['y'][stress_B_idx]
+
+                    # Lines should go from A to B
+                    xy = np.zeros((2, A_x.size * 3))
+                    xy[:, 2::3] = np.nan
+                    xy[0, 0::3] = A_x
+                    xy[0, 1::3] = B_x
+                    xy[1, 0::3] = A_y
+                    xy[1, 1::3] = B_y
+
+                    # Plotly doesn't support varying line color, but if it did, we would
+                    # do this:
+                    avg_dist = 0.5 * (
+                        proj_stresses[i_idx]['dist'][stress_A_idx] +
+                        proj_stresses[i_idx - 1]['dist'][stress_B_idx]
+                    )
+                    color_dim = np.abs(avg_dist) / np.max(np.abs(avg_dist))
+
+                    fig_data.append({
+                        'type': 'scatter',
+                        'x': xy[0],
+                        'y': xy[1],
+                        'mode': 'lines',
+                        'name': f'Stress path ({i_idx})',
+                        'line': {
+                            'width': 0.4,
+                            'color': 'rgba(120, 120, 120, 0.5)',
                         },
                     })
 
@@ -911,7 +1038,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
     def show_3D(self, normalise=True, resolution=DEF_3D_RES, equivalent_stress=None,
                 min_stress=None, max_stress=None, show_axes=True, planes=None,
-                stress_states=None, backend='plotly'):
+                stress_states=None, backend='plotly', stress_indices=None,
+                join_stress_states=False):
         """
         Parameters
         ----------
@@ -930,11 +1058,14 @@ class YieldFunction(metaclass=abc.ABCMeta):
             planes=planes,
             stress_states=stress_states,
             backend=backend,
+            stress_indices=stress_indices,
+            join_stress_states=join_stress_states,
         )
 
     def show_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
                 equivalent_stress=None, min_stress=None, max_stress=None,
-                stress_states=None, up=None, show_contour_grid=False):
+                stress_states=None, up=None, show_contour_grid=False, stress_indices=None,
+                join_stress_states=False):
         """
         Parameters
         ----------
@@ -953,4 +1084,6 @@ class YieldFunction(metaclass=abc.ABCMeta):
             stress_states=stress_states,
             up=up,
             show_contour_grid=show_contour_grid,
+            stress_indices=stress_indices,
+            join_stress_states=join_stress_states,
         )

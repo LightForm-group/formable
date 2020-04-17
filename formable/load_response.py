@@ -381,7 +381,8 @@ class LoadResponseSet(object):
 
     def show_yield_functions_3D(self, normalise=True, resolution=DEF_3D_RES,
                                 equivalent_stress=None, min_stress=None, max_stress=None,
-                                show_axes=True, planes=None, backend='plotly'):
+                                show_axes=True, planes=None, backend='plotly',
+                                join_stress_states=False):
         'Visualise all fitted yield functions and data in 3D.'
 
         if not self.yield_functions:
@@ -389,11 +390,15 @@ class LoadResponseSet(object):
 
         yld_funcs = []
         yld_stresses = []
+        stress_indices = []
         for yld_func_dict in self.yield_functions:
             yld_funcs.append(yld_func_dict['yield_function'])
-            yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]['values']
-            yld_stress_principal = get_principal_values(yld_stress)
+            yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]
+            yld_stress_vals = yld_stress['values']
+            resp_idx = yld_stress['response_idx']
+            yld_stress_principal = get_principal_values(yld_stress_vals)
             yld_stresses.append(yld_stress_principal)
+            stress_indices.append(resp_idx)
 
         return YieldFunction.compare_3D(
             yld_funcs,
@@ -405,12 +410,15 @@ class LoadResponseSet(object):
             show_axes=show_axes,
             planes=planes,
             stress_states=yld_stresses,
+            stress_indices=stress_indices,
             backend=backend,
+            join_stress_states=join_stress_states,
         )
 
     def show_yield_functions_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
                                 equivalent_stress=None, min_stress=None, max_stress=None,
-                                show_axes=True, up=None, show_contour_grid=False):
+                                show_axes=True, up=None, show_contour_grid=False,
+                                join_stress_states=False):
         'Visualise all fitted yield functions and data in 2D.'
 
         if not self.yield_functions:
@@ -418,11 +426,15 @@ class LoadResponseSet(object):
 
         yld_funcs = []
         yld_stresses = []
+        stress_indices = []
         for yld_func_dict in self.yield_functions:
             yld_funcs.append(yld_func_dict['yield_function'])
-            yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]['values']
-            yld_stress_principal = get_principal_values(yld_stress)
+            yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]
+            yld_stress_vals = yld_stress['values']
+            resp_idx = yld_stress['response_idx']
+            yld_stress_principal = get_principal_values(yld_stress_vals)
             yld_stresses.append(yld_stress_principal)
+            stress_indices.append(resp_idx)
 
         return YieldFunction.compare_2D(
             yld_funcs,
@@ -433,6 +445,8 @@ class LoadResponseSet(object):
             min_stress=min_stress,
             max_stress=max_stress,
             stress_states=yld_stresses,
+            stress_indices=stress_indices,
             up=up,
             show_contour_grid=show_contour_grid,
+            join_stress_states=join_stress_states,
         )
