@@ -7,7 +7,6 @@ inherit from this class.
 
 import abc
 import functools
-from pprint import pprint
 
 import numpy as np
 import pyvista as pv
