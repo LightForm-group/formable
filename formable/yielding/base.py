@@ -205,7 +205,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def compare_3D(cls, yield_functions, normalise=True, resolution=DEF_3D_RES,
                    equivalent_stress=None, min_stress=None, max_stress=None,
                    show_axes=True, planes=None, stress_states=None, backend='plotly',
-                   stress_indices=None, join_stress_states=False):
+                   stress_indices=None, join_stress_states=False, show_contour_grid=False):
         """Visualise one or more yield functions in 3D.
 
         Parameters
@@ -285,6 +285,25 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
             fig_data = []
 
+            if show_contour_grid:
+
+                min_x, max_x = min(stress_X), max(stress_X)
+                min_y, max_y = min(stress_Y), max(stress_Y)
+                min_z, max_z = min(stress_Z), max(stress_Z)
+
+                fig_data.append({
+                    'type': 'scatter3d',
+                    'mode': 'markers',
+                    'marker': {
+                        'symbol': 'x',
+                        'color': 'black',
+                        'size': 4,
+                    },
+                    'x': [min_x, min_x, min_x, min_x, max_x, max_x, max_x, max_x],
+                    'y': [min_y, min_y, max_y, max_y, min_y, min_y, max_y, max_y],
+                    'z': [min_z, max_z, min_z, max_z, min_z, max_z, min_z, max_z],
+                })
+
             for idx, (yld_func, i) in enumerate(zip(yield_functions, values_all)):
 
                 name = f'{idx + 1}. {yld_func.__class__.__name__}'
@@ -298,17 +317,17 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     'y': stress_Y,
                     'z': stress_Z,
                     'value': i,
+                    'name': name,
+                    'opacity': 0.5,
+                    'showlegend': True,
                     'isomin': 0,
                     'isomax': 0,
                     'surface_count': 1,
-                    'opacity': 0.5,
                     'colorscale': [
                         [0, DEFAULT_PLOTLY_COLORS[idx]],
                         [1, DEFAULT_PLOTLY_COLORS[idx]],
                     ],
                     'showscale': False,
-                    'showlegend': True,
-                    'name': name,
                 })
 
             fig_annots = []
@@ -1039,7 +1058,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def show_3D(self, normalise=True, resolution=DEF_3D_RES, equivalent_stress=None,
                 min_stress=None, max_stress=None, show_axes=True, planes=None,
                 stress_states=None, backend='plotly', stress_indices=None,
-                join_stress_states=False):
+                join_stress_states=False, show_contour_grid=False):
         """
         Parameters
         ----------
@@ -1060,6 +1079,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
             backend=backend,
             stress_indices=stress_indices,
             join_stress_states=join_stress_states,
+            show_contour_grid=show_contour_grid,
         )
 
     def show_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
