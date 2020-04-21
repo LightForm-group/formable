@@ -945,18 +945,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
             resolution=resolution,
         )
 
-        # TODO: sort this out:
-        # Remove any NaN values:
-        # valid_idx = np.logical_not(np.isnan(grid_values))
-        # grid_values = grid_values[valid_idx]
-        # stress_grid = stress_grid[valid_idx]
-
         grid_values_all = []
         for yld_func in yield_functions:
             values_i = yld_func.get_value(stress_grid * equivalent_stress)
-            # Normalise values solely for the purpose of the visualisation (so  contour
+            # Normalise values solely for the purpose of the visualisation (so contour
             # values are of the order 1):
-            abs_max = np.max(np.abs(values_i))
+            abs_max = np.nanmax(np.abs(values_i))
             values_i /= abs_max
             grid_values_all.append(values_i)
 
@@ -1000,7 +994,10 @@ class YieldFunction(metaclass=abc.ABCMeta):
         grid_values_all = []
         for yld_func in yield_functions:
             values_i = yld_func.get_value(stress_grid * equivalent_stress)
-            values_i /= equivalent_stress
+            # Normalise values solely for the purpose of the visualisation (so contour
+            # values are of the order 1):
+            abs_max = np.nanmax(np.abs(values_i))
+            values_i /= abs_max
             grid_values_all.append(values_i)
 
         return grid_coords_2D, grid_values_all, basis_unit
