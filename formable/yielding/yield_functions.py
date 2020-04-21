@@ -141,24 +141,12 @@ class Barlat_Yld91(YieldFunction):
         G = stress_states[:, 2, 0]
         H = stress_states[:, 0, 1]
 
-        # print('A')
-        # print(A)
-
-        # print('B')
-        # print(B)
-
         aA = a * A
         bB = b * B
         cC = c * C
         fF = f * F
         gG = g * G
         hH = h * H
-
-        # print('aA')
-        # print(aA)
-
-        # print('bB')
-        # print(bB)
 
         # Stress deviator invariants:
         I_2 = (
@@ -176,39 +164,23 @@ class Barlat_Yld91(YieldFunction):
             )
         )
 
-        # print('I_2')
-        # print(I_2)
+        with np.errstate(invalid='ignore'):
+            # For hydrostatic stresses, I_2 will be zero, so theta will be np.nan:
+            theta = np.arccos(I_3 / I_2**(3/2))
 
-        # print('I_3')
-        # print(I_3)
+        finite_idx = np.isfinite(theta)
 
-        theta = np.arccos(I_3 / I_2**(3/2))
+        Phi_1 = (+2 * np.cos(((2 * theta[finite_idx]) + np.pi) / 6))**exponent
+        Phi_2 = (+2 * np.cos(((2 * theta[finite_idx]) - (3 * np.pi)) / 6))**exponent
+        Phi_3 = (-2 * np.cos(((2 * theta[finite_idx]) + (5 * np.pi)) / 6))**exponent
 
-        # print('theta: ')
-        # print(theta)
-
-        Phi_1 = (+2 * np.cos(((2 * theta) + np.pi) / 6))**exponent
-        Phi_2 = (+2 * np.cos(((2 * theta) - (3 * np.pi)) / 6))**exponent
-        Phi_3 = (-2 * np.cos(((2 * theta) + (5 * np.pi)) / 6))**exponent
-
-        # print('Phi_1: ')
-        # print(Phi_1)
-
-        # print('Phi_2: ')
-        # print(Phi_2)
-
-        # print('Phi_3: ')
-        # print(Phi_3)
-
-        Phi = ((3 * I_2)**(exponent / 2)) * (Phi_1 + Phi_2 + Phi_3)
+        # Where theta is np.nan, Phi is zero:
+        Phi = np.zeros(stress_states.shape[0])
+        Phi[finite_idx] = (
+            ((3 * I_2[finite_idx])**(exponent / 2)) * (Phi_1 + Phi_2 + Phi_3)
+        )
 
         value = (Phi / 2)**(1 / exponent) - equivalent_stress
-
-        # print('value:')
-        # print(value)
-
-        # w = np.where(np.abs(value) < 0.1)[0]
-        # print('w: {}'.format(w))
 
         return value
 
