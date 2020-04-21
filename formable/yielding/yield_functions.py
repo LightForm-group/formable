@@ -599,12 +599,12 @@ class Hill1979(YieldFunction):
         princ = np.sort(np.linalg.eigvals(stress_states), axis=-1)[:, ::-1]
 
         diff_exp_sum = (
-            f * (princ[:, 1] - princ[:, 2])**exponent +
-            g * (princ[:, 2] - princ[:, 0])**exponent +
-            h * (princ[:, 0] - princ[:, 1])**exponent +
-            a * ((2 * princ[:, 0]) - princ[:, 1] - princ[:, 2])**exponent +
-            b * ((2 * princ[:, 1]) - princ[:, 2] - princ[:, 0])**exponent +
-            c * ((2 * princ[:, 2]) - princ[:, 0] - princ[:, 1])**exponent
+            f * np.abs(princ[:, 1] - princ[:, 2])**exponent +
+            g * np.abs(princ[:, 2] - princ[:, 0])**exponent +
+            h * np.abs(princ[:, 0] - princ[:, 1])**exponent +
+            a * np.abs((2 * princ[:, 0]) - princ[:, 1] - princ[:, 2])**exponent +
+            b * np.abs((2 * princ[:, 1]) - princ[:, 2] - princ[:, 0])**exponent +
+            c * np.abs((2 * princ[:, 2]) - princ[:, 0] - princ[:, 1])**exponent
         )
 
         value = diff_exp_sum**(1/exponent) - equivalent_stress
