@@ -372,6 +372,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 for idx, stresses in enumerate(stress_states):
 
                     if stresses is not None:
+                        stresses = stresses.copy()
 
                         if normalise:
                             stresses /= eq_stress
@@ -555,6 +556,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
             proj_stresses = []  # 1 element for each yield_function/stress_state
             for stresses in stress_states:
                 if stresses is not None:
+                    stresses = stresses.copy()
                     if normalise:
                         stresses /= eq_stress
 
