@@ -325,6 +325,11 @@ class LoadResponseSet(object):
         elif not issubclass(yield_function, YieldFunction):
             raise TypeError(msg)
 
+        bad_kwargs = list(set(kwargs.keys()) - set(yield_function.PARAMETERS))
+        if bad_kwargs:
+            bad_kwargs_fmt = ', '.join([f'"{i}"' for i in bad_kwargs])
+            raise ValueError(f'Unknown yield function parameters: {bad_kwargs_fmt}')
+
         if not yield_point_criteria_idx:
             yield_point_criteria_idx = [
                 [ypc_idx, ypc_val_idx]
