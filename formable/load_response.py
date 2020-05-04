@@ -108,11 +108,12 @@ class LoadResponse(object):
 
         Returns
         -------
-        yield_stress : ndarray of shape (M, 3, 3)
-            Yield stress tensors, one for each of M yield point criteria values.
-        good_idx : list of int
-            Indices of yield point criteria values for which the yield stress was
-            successfully calculated.
+        Two-tuple of:
+            yield_stress : ndarray of shape (M, 3, 3)
+                Yield stress tensors, one for each of M yield point criteria values.
+            good_idx : list of int
+                Indices of yield point criteria values for which the yield stress was
+                successfully calculated.
 
         """
 
