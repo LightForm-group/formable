@@ -257,7 +257,7 @@ class LoadResponseSet(object):
                     if not isinstance(uniaxial_response, LoadResponse):
                         raise TypeError('`uniaxial_response` must be a LoadResponse')
 
-                    if not uniaxial_response.is_uniaxial(tol=1e-3):
+                    if not uniaxial_response.is_uniaxial(tol=5e-3):
                         msg = ('Specified `uniaxial_response` does not appear to be '
                                'uniaxial.')
                         raise ValueError(msg)
