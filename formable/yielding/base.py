@@ -205,7 +205,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def compare_3D(cls, yield_functions, normalise=True, resolution=DEF_3D_RES,
                    equivalent_stress=None, min_stress=None, max_stress=None,
                    show_axes=True, planes=None, stress_states=None, backend='plotly',
-                   stress_indices=None, join_stress_states=False, show_contour_grid=False):
+                   stress_indices=None, join_stress_states=False, show_contour_grid=False,
+                   legend_text=None):
         """Visualise one or more yield functions in 3D.
 
         Parameters
@@ -236,6 +237,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
             if stress_indices and len(stress_indices) != len(stress_states):
                 msg = '`stress_indices` must have the same length as `stress_states`.'
+                raise ValueError(msg)
+
+        if legend_text:
+            if len(legend_text) != len(yield_functions):
+                msg = ('If specified, `legend_text` must be a list of equal length to '
+                       '`yield_function`.')
                 raise ValueError(msg)
 
         stress_range = cls._get_multi_plot_stress_range(
@@ -308,6 +315,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
                 name = f'{idx + 1}. {yld_func.__class__.__name__}'
                 yield_point = getattr(yld_func, 'yield_point', None)
+                if legend_text:
+                    name += f' [{legend_text[idx]}] '
                 if yield_point:
                     name += f' ({yield_point})'
 
@@ -464,7 +473,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def compare_2D(cls, yield_functions, plane, normalise=True, resolution=DEF_2D_RES,
                    equivalent_stress=None, min_stress=None, max_stress=None,
                    stress_states=None, up=None, show_contour_grid=False,
-                   stress_indices=None, join_stress_states=False):
+                   stress_indices=None, join_stress_states=False, legend_text=None):
         """Visualise multiple yield functions in 2D.
 
         Parameters
@@ -490,6 +499,12 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
             if stress_indices and len(stress_indices) != len(stress_states):
                 msg = '`stress_indices` must have the same length as `stress_states`.'
+                raise ValueError(msg)
+
+        if legend_text:
+            if len(legend_text) != len(yield_functions):
+                msg = ('If specified, `legend_text` must be a list of equal length to '
+                       '`yield_function`.')
                 raise ValueError(msg)
 
         stress_range = cls._get_multi_plot_stress_range(
@@ -524,6 +539,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
         for idx, (yld_func, i) in enumerate(zip(yield_functions, values_all)):
 
             name = f'{idx + 1}. {yld_func.__class__.__name__}'
+            if legend_text:
+                name += f' [{legend_text[idx]}] '
+
             yield_point = getattr(yld_func, 'yield_point', None)
             if yield_point:
                 name += f' ({yield_point})'
@@ -1060,7 +1078,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def show_3D(self, normalise=True, resolution=DEF_3D_RES, equivalent_stress=None,
                 min_stress=None, max_stress=None, show_axes=True, planes=None,
                 stress_states=None, backend='plotly', stress_indices=None,
-                join_stress_states=False, show_contour_grid=False):
+                join_stress_states=False, show_contour_grid=False, legend_text=None):
         """
         Parameters
         ----------
@@ -1082,12 +1100,13 @@ class YieldFunction(metaclass=abc.ABCMeta):
             stress_indices=stress_indices,
             join_stress_states=join_stress_states,
             show_contour_grid=show_contour_grid,
+            legend_text=legend_text,
         )
 
     def show_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
                 equivalent_stress=None, min_stress=None, max_stress=None,
                 stress_states=None, up=None, show_contour_grid=False, stress_indices=None,
-                join_stress_states=False):
+                join_stress_states=False, legend_text=None):
         """
         Parameters
         ----------
@@ -1108,4 +1127,5 @@ class YieldFunction(metaclass=abc.ABCMeta):
             show_contour_grid=show_contour_grid,
             stress_indices=stress_indices,
             join_stress_states=join_stress_states,
+            legend_text=legend_text,
         )
