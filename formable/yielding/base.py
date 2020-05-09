@@ -9,7 +9,6 @@ import abc
 import functools
 
 import numpy as np
-import pyvista as pv
 from plotly import graph_objects
 from plotly.colors import DEFAULT_PLOTLY_COLORS
 from scipy.optimize import least_squares
@@ -268,21 +267,6 @@ class YieldFunction(metaclass=abc.ABCMeta):
         if backend == 'pyvista':
 
             raise NotImplementedError('not yet.')
-
-            grid = pv.StructuredGrid(stress_X, stress_Y, stress_Z)
-            for yld_func, i in zip(yield_functions, values_all):
-                grid[yld_func.__class__.__name__] = i
-
-            # TODO: fix this, need a contours object for each yield surface?
-            contours = grid.contour([0])
-
-            pv.set_plot_theme('document')
-            p = pv.PlotterITK()
-            p.add_mesh(contours, scalars=contours.points[:, 2])
-            if stress_states is not None:
-                p.add_points(stress_states)
-
-            return p
 
         elif backend == 'plotly':
 

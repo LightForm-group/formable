@@ -45,8 +45,6 @@ setup(
         'numpy',
         'plotly',
         'vecmaths',
-        'pyvista',
-        'itkwidgets',  # for pyvista in Jupyter notebooks
     ],
     project_urls={
         'Github': 'https://github.com/LightForm-group/formable',
