@@ -625,6 +625,7 @@ class Hill1948(YieldFunction):
         'L',
         'M',
         'N',
+        'equivalent_stress',
     ]
 
     LITERATURE_VALUES = {
@@ -644,7 +645,7 @@ class Hill1948(YieldFunction):
         }
     }
 
-    def __init__(self, F, G, H, L, M, N):
+    def __init__(self, F, G, H, L, M, N, equivalent_stress):
 
         self.F = F
         self.G = G
@@ -652,6 +653,7 @@ class Hill1948(YieldFunction):
         self.L = L
         self.M = M
         self.N = N
+        self.equivalent_stress = equivalent_stress
 
     @staticmethod
     @yield_function_fitter
@@ -669,7 +671,7 @@ class Hill1948(YieldFunction):
             N * 2 * stress_states[:, 0, 1]**2
         )
 
-        value = diff_sq_sum - 1
+        value = ((diff_sq_sum ** (1 / 2)) / kwargs['equivalent_stress']) - 1
 
         return value
 
