@@ -6,7 +6,6 @@ from warnings import warn
 
 import numpy as np
 from scipy.optimize import least_squares
-from damask_parse import read_table as read_damask_table
 
 from formable.maths_utils import get_principal_values
 from formable.utils import requires, at_most_one_of
