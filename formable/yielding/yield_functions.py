@@ -673,6 +673,11 @@ class Hill1948(YieldFunction):
 
         return value
 
+    @property
+    def lankford(self):
+        'Get the Lankford coefficient (R-value)'
+        return self.H / self.G
+
 
 class Dummy2DYieldFunction(YieldFunction):
     'Dummy 2D yield function that resembles a cylinder about the z-axis.'
