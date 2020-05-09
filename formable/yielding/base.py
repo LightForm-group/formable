@@ -677,12 +677,27 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     })
 
         if show_contour_grid:
+
+            cg_text_strs = []
+            for idx, (yld_func, i) in enumerate(zip(yield_functions, values_all)):
+                cg_text_i = f'{idx + 1}. {yld_func.__class__.__name__}'
+                if legend_text:
+                    cg_text_i += f' [{legend_text[idx]}] '
+                cg_text_strs.append(cg_text_i)
+
+            cg_text_all = []
+            for cg_text_i, i in zip(cg_text_strs, values_all):
+                cg_text_all.append([f'{cg_text_i}: {j:.3f}' for j in i])
+
+            cg_text_final = ['<br>'.join(list(i)) for i in zip(*cg_text_all)]
+
             fig_data.append(
                 {
                     'type': 'scatter',
                     'x': grid_coords_2D[0],
                     'y': grid_coords_2D[1],
                     'mode': 'markers',
+                    'text': cg_text_final,
                     'marker': {
                         'size': 3,
                         'color': 'gray',
