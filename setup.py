@@ -31,11 +31,18 @@ def get_long_description():
     return contents
 
 
+def get_changelog():
+    changelog_file = 'CHANGELOG.md'
+    with open(changelog_file, encoding='utf-8') as handle:
+        contents = handle.read()
+    return contents
+
+
 setup(
     name='formable',
     version=get_version(),
     description=('Formability analysis in materials science.'),
-    long_description=get_long_description(),
+    long_description=get_long_description() + '\n\n' + get_changelog(),
     long_description_content_type='text/markdown',
     author='Adam J. Plowman',
     author_email='adam.plowman@manchester.ac.uk',
