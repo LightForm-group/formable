@@ -44,7 +44,7 @@ class VonMises(YieldFunction):
             (princ[:, 1] - princ[:, 2])**2
         )
 
-        value = np.sqrt(diff_sq_sum / 2) - kwargs['equivalent_stress']
+        value = (np.sqrt(diff_sq_sum / 2) / kwargs['equivalent_stress']) - 1
 
         return value
 
@@ -70,7 +70,7 @@ class Tresca(YieldFunction):
             (princ[:, 0] - princ[:, 2]),
             (princ[:, 1] - princ[:, 2]),
         ])
-        value = np.max(diff, axis=0) - kwargs['equivalent_stress']
+        value = (np.max(diff, axis=0) / kwargs['equivalent_stress']) - 1
 
         return value
 
@@ -180,7 +180,7 @@ class Barlat_Yld91(YieldFunction):
             ((3 * I_2[finite_idx])**(exponent / 2)) * (Phi_1 + Phi_2 + Phi_3)
         )
 
-        value = (Phi / 2)**(1 / exponent) - equivalent_stress
+        value = (((Phi / 2)**(1 / exponent)) / equivalent_stress) - 1
 
         return value
 
@@ -299,7 +299,7 @@ class Barlat_Yld2000_2D(YieldFunction):
 
         phi = phi_prime + phi_dprime
 
-        value = (phi / 2)**(1 / exponent) - equivalent_stress
+        value = (((phi / 2)**(1 / exponent)) / equivalent_stress) - 1
 
         return value
 
@@ -501,8 +501,7 @@ class Barlat_Yld2004_18p(YieldFunction):
         princ_sum_terms = np.array(princ_sum_terms).T
 
         princ_sum = np.sum(princ_sum_terms, axis=-1)
-
-        value = (princ_sum / 4) ** (1 / exponent) - equivalent_stress
+        value = (((princ_sum / 4) ** (1 / exponent)) / equivalent_stress) - 1
 
         return value
 
@@ -534,7 +533,7 @@ class Hosford(YieldFunction):
             (princ[:, 1] - princ[:, 2])**exponent
         )
 
-        value = ((diff_sq_sum / 2)**(1 / exponent)) - equivalent_stress
+        value = (((diff_sq_sum / 2)**(1 / exponent)) / equivalent_stress) - 1
 
         return value
 
@@ -607,7 +606,7 @@ class Hill1979(YieldFunction):
             c * np.abs((2 * princ[:, 2]) - princ[:, 0] - princ[:, 1])**exponent
         )
 
-        value = diff_exp_sum**(1/exponent) - equivalent_stress
+        value = ((diff_exp_sum ** (1 / exponent)) / equivalent_stress) - 1
 
         return value
 
