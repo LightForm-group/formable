@@ -210,3 +210,8 @@ def get_deviatoric_stress(stress, voigt=False):
     stress_dev = stress - hydro_mat
 
     return stress_dev
+
+
+def line(x, m, c):
+    'Linear model.'
+    return (m * x) + c

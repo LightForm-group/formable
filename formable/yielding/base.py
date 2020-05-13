@@ -11,7 +11,7 @@ import functools
 import numpy as np
 from plotly import graph_objects
 from plotly.colors import DEFAULT_PLOTLY_COLORS
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, curve_fit
 
 from formable import utils, maths_utils
 
@@ -457,7 +457,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def compare_2D(cls, yield_functions, plane, normalise=True, resolution=DEF_2D_RES,
                    equivalent_stress=None, min_stress=None, max_stress=None,
                    stress_states=None, up=None, show_contour_grid=False,
-                   stress_indices=None, join_stress_states=False, legend_text=None):
+                   stress_indices=None, join_stress_states=False, legend_text=None,
+                   show_numerical_lankford=False, show_numerical_lankford_fit=False):
         """Visualise multiple yield functions in 2D.
 
         Parameters
@@ -530,6 +531,90 @@ class YieldFunction(metaclass=abc.ABCMeta):
             if yield_point:
                 name += f' ({yield_point})'
 
+            if show_numerical_lankford:
+
+                num_lank = yld_func.get_numerical_lankford()
+                name += f' [R = {num_lank["lankford"]:.3f}]'
+                fit_centre = num_lank['fit_centre']
+
+                if normalise:
+                    grid_x = num_lank['grid_points'][0] - fit_centre
+                    grid_x = (grid_x / eq_stress)
+                    grid_x += (fit_centre / eq_stress)
+
+                    grid_y = num_lank['grid_points'][1] / eq_stress
+                else:
+                    grid_x = num_lank['grid_points'][0] / 1e6
+                    grid_y = num_lank['grid_points'][1] / 1e6
+
+                if show_numerical_lankford_fit:
+                    fig_data.append(
+                        {
+                            'type': 'scatter',
+                            'x': grid_x[num_lank['grid_point_fitted_idx']],
+                            'y': grid_y[num_lank['grid_point_fitted_idx']],
+                            'mode': 'markers',
+                            'marker': {
+                                'size': 4,
+                                'color': DEFAULT_PLOTLY_COLORS[idx],
+                            },
+                            'name': 'Tangent fit data',
+                            'legendgroup': name,
+                        }
+                    )
+
+                tangent_vec = num_lank['tangent_vector']
+                tangent_mag = max_stress * 0.2
+                t1 = - (0.5 * tangent_mag * tangent_vec)
+                t2 = + (0.5 * tangent_mag * tangent_vec)
+                tangent_line = np.vstack([t1, t2]).T
+
+                normal_vec = num_lank['normal_vector']
+                normal_vec *= tangent_mag * 1.3
+                normal_line_seg = np.array([
+                    [0, 0 + normal_vec[0]],
+                    [0, normal_vec[1]]
+                ])
+
+                if normalise:
+                    normal_line_seg[0] += (fit_centre / eq_stress)
+                    tangent_line[0] += (fit_centre / eq_stress)
+                else:
+                    normal_line_seg = normal_line_seg / 1e6
+                    normal_line_seg[0] += (fit_centre / 1e6)
+                    tangent_line = tangent_line / 1e6
+                    tangent_line[0] += (fit_centre / 1e6)
+
+                fig_data.append(
+                    {
+                        'type': 'scatter',
+                        'x': tangent_line[0],
+                        'y': tangent_line[1],
+                        'mode': 'lines',
+                        'line': {
+                            'color': DEFAULT_PLOTLY_COLORS[idx],
+                        },
+                        'showlegend': False,
+                        'name': name,
+                        'legendgroup': name,
+                    },
+                )
+
+                fig_data.append(
+                    {
+                        'type': 'scatter',
+                        'x': normal_line_seg[0],
+                        'y': normal_line_seg[1],
+                        'mode': 'lines',
+                        'line': {
+                            'color': DEFAULT_PLOTLY_COLORS[idx],
+                        },
+                        'showlegend': False,
+                        'name': name,
+                        'legendgroup': name,
+                    },
+                )
+
             fig_data.append({
                 'type': 'contour',
                 'x': grid_coords_2D[0],
@@ -551,6 +636,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 'showlegend': True,
                 'hoverinfo': 'none',
                 'name': name,
+                'legendgroup': name,
             })
 
         if stress_states is not None:
@@ -1105,7 +1191,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def show_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
                 equivalent_stress=None, min_stress=None, max_stress=None,
                 stress_states=None, up=None, show_contour_grid=False, stress_indices=None,
-                join_stress_states=False, legend_text=None):
+                join_stress_states=False, legend_text=None,
+                show_numerical_lankford=False, show_numerical_lankford_fit=False):
         """
         Parameters
         ----------
@@ -1127,4 +1214,84 @@ class YieldFunction(metaclass=abc.ABCMeta):
             stress_indices=stress_indices,
             join_stress_states=join_stress_states,
             legend_text=legend_text,
+            show_numerical_lankford=show_numerical_lankford,
+            show_numerical_lankford_fit=show_numerical_lankford_fit,
         )
+
+    def get_numerical_lankford(self, fit_domain=0.05, resolution=300, tol=1e-4):
+        """Get the Lankford coefficient by numerically fitting the tangent to the yield
+        function.
+
+        Parameters
+        ----------
+        fit_domain : float, optional
+            The side lengths of the box within which to fit a line (i.e. the yield
+            function tangent), expressed as a fraction of the equivalent stress.
+        resolution : int, optional
+            Size of the grid within the fitting domain, on which values of the yield
+            function will be evaluated.
+        tol : float, optional
+            Yield function values that are within this value from zero will be included
+            in the tangent fit.
+
+        Returns
+        -------
+        lankford : float
+
+        """
+
+        if not hasattr(self, 'equivalent_stress'):
+            msg = 'Yield function must have an `equivalent_stress` parameter.'
+            raise NotImplementedError(msg)
+        else:
+            equiv_stress = getattr(self, 'equivalent_stress')
+
+        # Identify a uniaxial stress state that is close to the yield surface (it will
+        # be close to the "equivalent stress", but for some reason they don't always
+        # precisely coincide):
+        fit_centre_range = np.linspace(-0.5, 0.5, num=10000) * equiv_stress
+        fit_centre_range += equiv_stress
+        num_ss = fit_centre_range.shape[0]
+        stress_states = np.tile(np.eye(3), num_ss).reshape(num_ss, 3, 3)
+        stress_states[:, 0, 0] = fit_centre_range
+        fit_centre_vals = self.get_value(stress_states)
+        fit_centre_idx = np.argmin(np.abs(fit_centre_vals))
+        fit_centre = fit_centre_range[fit_centre_idx]
+
+        X, Y = np.meshgrid(*[np.linspace(-0.5, 0.5, num=resolution)] * 2)
+        xy = np.vstack([X.flatten(), Y.flatten()])
+        xy *= fit_centre * fit_domain
+        xy += np.array([[fit_centre, 0]]).T
+
+        num_ss = xy.shape[1]
+        stress_states = np.tile(np.eye(3), (num_ss, 1)).reshape(num_ss, 3, 3)
+        stress_states[:, 0, 0] = xy[0]
+        stress_states[:, 1, 1] = xy[1]
+
+        vals = self.get_value(stress_states)
+        good_idx = np.where((np.abs(vals) - tol) < 0)[0]
+        if not good_idx.size:
+            raise ValueError(f'No yield surface solutions within `tol={tol}`.')
+
+        fit_coords = xy[:, good_idx]
+        popt, pcov = curve_fit(maths_utils.line, fit_coords[0], fit_coords[1])
+        m = popt[0]
+
+        tangent_vector = np.array([1, m])
+        tangent_vector_unit = tangent_vector / np.linalg.norm(tangent_vector)
+
+        normal = -1 * np.array([-m, 1])  # -1 to point out from the surface
+        normal_n = normal / np.linalg.norm(normal)
+
+        lankford = normal_n[1] / -(normal_n[0] + normal_n[1])
+
+        out = {
+            'grid_points': xy,
+            'grid_point_fitted_idx': good_idx,
+            'normal_vector': normal_n,
+            'tangent_vector': tangent_vector_unit,
+            'lankford': lankford,
+            'fit_centre': fit_centre,
+        }
+
+        return out
