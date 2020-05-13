@@ -26,6 +26,8 @@ class LoadResponse(object):
     ALLOWED_DATA = [
         'true_stress',
         'equivalent_strain',
+        'equivalent_plastic_strain',
+        'accumulated_shear_strain',
     ]
 
     def __init__(self, **incremental_data):
@@ -55,6 +57,11 @@ class LoadResponse(object):
 
         self._true_stress = incremental_data.pop('true_stress', None)
         self._equivalent_strain = incremental_data.pop('equivalent_strain', None)
+        self._equivalent_plastic_strain = incremental_data.pop(
+            'equivalent_plastic_strain', None)
+        self._accumulated_shear_strain = incremental_data.pop(
+            'accumulated_shear_strain', None
+        )
 
         if incremental_data:
             unknown_fmt = ', '.join(['"{}"'.format(i) for i in incremental_data])
@@ -87,6 +94,14 @@ class LoadResponse(object):
     @property
     def equivalent_strain(self):
         return self._equivalent_strain
+
+    @property
+    def equivalent_plastic_strain(self):
+        return self._equivalent_plastic_strain
+
+    @property
+    def accumulated_shear_strain(self):
+        return self._accumulated_shear_strain
 
     @property
     @requires('true_stress')

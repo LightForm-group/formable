@@ -64,6 +64,10 @@ class YieldPointCriteria(object):
     YIELD_POINT_FUNC_MAP = {
         ('equivalent_strain',
          'equivalent_strain'): get_yield_stress_from_equivalent_strain,
+        ('equivalent_plastic_strain',
+         'equivalent_plastic_strain'): get_yield_stress_from_equivalent_strain,
+        ('accumulated_shear_strain',
+         'accumulated_shear_strain'): get_yield_stress_from_equivalent_strain,
     }
 
     def __init__(self, threshold, values, source=None, **kwargs):
