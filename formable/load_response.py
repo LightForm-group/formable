@@ -403,7 +403,7 @@ class LoadResponseSet(object):
                                 equivalent_stress=None, min_stress=None, max_stress=None,
                                 show_axes=True, planes=None, backend='plotly',
                                 show_stress_states=True, join_stress_states=False,
-                                show_contour_grid=False):
+                                show_contour_grid=False, layout=None,):
         'Visualise all fitted yield functions and data in 3D.'
 
         if not self.yield_functions:
@@ -439,6 +439,7 @@ class LoadResponseSet(object):
             backend=backend,
             join_stress_states=join_stress_states,
             show_contour_grid=show_contour_grid,
+            layout=layout,
         )
 
     def show_yield_functions_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
@@ -446,7 +447,7 @@ class LoadResponseSet(object):
                                 show_axes=True, up=None, show_contour_grid=False,
                                 show_stress_states=True, join_stress_states=False,
                                 show_numerical_lankford=False,
-                                show_numerical_lankford_fit=False):
+                                show_numerical_lankford_fit=False, layout=None):
         'Visualise all fitted yield functions and data in 2D.'
 
         if not self.yield_functions:
@@ -483,4 +484,5 @@ class LoadResponseSet(object):
             join_stress_states=join_stress_states,
             show_numerical_lankford=show_numerical_lankford,
             show_numerical_lankford_fit=show_numerical_lankford_fit,
+            layout=layout,
         )

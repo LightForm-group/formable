@@ -205,7 +205,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                    equivalent_stress=None, min_stress=None, max_stress=None,
                    show_axes=True, planes=None, stress_states=None, backend='plotly',
                    stress_indices=None, join_stress_states=False, show_contour_grid=False,
-                   legend_text=None):
+                   legend_text=None, layout=None):
         """Visualise one or more yield functions in 3D.
 
         Parameters
@@ -448,6 +448,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                         },
                         'annotations': fig_annots,
                     },
+                    **(layout or {}),
                 },
             )
 
@@ -458,7 +459,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
                    equivalent_stress=None, min_stress=None, max_stress=None,
                    stress_states=None, up=None, show_contour_grid=False,
                    stress_indices=None, join_stress_states=False, legend_text=None,
-                   show_numerical_lankford=False, show_numerical_lankford_fit=False):
+                   show_numerical_lankford=False, show_numerical_lankford_fit=False,
+                   layout=None):
         """Visualise multiple yield functions in 2D.
 
         Parameters
@@ -852,7 +854,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     'xanchor': 'center',
                     'y': -0.15,
                     'x': 0.5,
-                }
+                },
+                **(layout or {}),
             }
         )
 
@@ -1163,7 +1166,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
     def show_3D(self, normalise=True, resolution=DEF_3D_RES, equivalent_stress=None,
                 min_stress=None, max_stress=None, show_axes=True, planes=None,
                 stress_states=None, backend='plotly', stress_indices=None,
-                join_stress_states=False, show_contour_grid=False, legend_text=None):
+                join_stress_states=False, show_contour_grid=False, legend_text=None,
+                layout=None):
         """
         Parameters
         ----------
@@ -1186,13 +1190,15 @@ class YieldFunction(metaclass=abc.ABCMeta):
             join_stress_states=join_stress_states,
             show_contour_grid=show_contour_grid,
             legend_text=legend_text,
+            layout=layout,
         )
 
     def show_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
                 equivalent_stress=None, min_stress=None, max_stress=None,
                 stress_states=None, up=None, show_contour_grid=False, stress_indices=None,
                 join_stress_states=False, legend_text=None,
-                show_numerical_lankford=False, show_numerical_lankford_fit=False):
+                show_numerical_lankford=False, show_numerical_lankford_fit=False,
+                layout=None):
         """
         Parameters
         ----------
@@ -1216,6 +1222,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
             legend_text=legend_text,
             show_numerical_lankford=show_numerical_lankford,
             show_numerical_lankford_fit=show_numerical_lankford_fit,
+            layout=layout,
         )
 
     def get_numerical_lankford(self, fit_domain=0.05, resolution=300, tol=1e-4):
