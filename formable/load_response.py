@@ -311,7 +311,7 @@ class LoadResponseSet(object):
         Parameters
         ----------
         yield_function : str or YieldFunction class
-            The yield function to fit. Available yield functions can be displayed using: 
+            The yield function to fit. Available yield functions can be displayed using:
                 `from formable import AVAILABLE_YIELD_FUNCTIONS`
                 `print(AVAILABLE_YIELD_FUNCTIONS)`
         yield_point_criteria_idx : list of (list of int of length 2), optional
@@ -320,7 +320,7 @@ class LoadResponseSet(object):
             the yield function is fitted to all available yield stresses.
         initial_params : dict, optional
             Any initial guesses for the fitting parameters. Mutually exclusive with
-            additional keyword arguments passed, which are considered to be fixed.            
+            additional keyword arguments passed, which are considered to be fixed.
         kwargs : dict
             Any yield function parameters to be fixed during the fit can be passed as
             additional keyword arguments.
@@ -402,7 +402,8 @@ class LoadResponseSet(object):
     def show_yield_functions_3D(self, normalise=True, resolution=DEF_3D_RES,
                                 equivalent_stress=None, min_stress=None, max_stress=None,
                                 show_axes=True, planes=None, backend='plotly',
-                                join_stress_states=False, show_contour_grid=False):
+                                show_stress_states=True, join_stress_states=False,
+                                show_contour_grid=False):
         'Visualise all fitted yield functions and data in 3D.'
 
         if not self.yield_functions:
@@ -419,6 +420,10 @@ class LoadResponseSet(object):
             yld_stress_principal = get_principal_values(yld_stress_vals)
             yld_stresses.append(yld_stress_principal)
             stress_indices.append(resp_idx)
+
+        if not show_stress_states:
+            yld_stresses = None
+            stress_indices = None
 
         return YieldFunction.compare_3D(
             yld_funcs,
@@ -439,7 +444,9 @@ class LoadResponseSet(object):
     def show_yield_functions_2D(self, plane, normalise=True, resolution=DEF_2D_RES,
                                 equivalent_stress=None, min_stress=None, max_stress=None,
                                 show_axes=True, up=None, show_contour_grid=False,
-                                join_stress_states=False):
+                                show_stress_states=True, join_stress_states=False,
+                                show_numerical_lankford=False,
+                                show_numerical_lankford_fit=False):
         'Visualise all fitted yield functions and data in 2D.'
 
         if not self.yield_functions:
@@ -457,6 +464,10 @@ class LoadResponseSet(object):
             yld_stresses.append(yld_stress_principal)
             stress_indices.append(resp_idx)
 
+        if not show_stress_states:
+            yld_stresses = None
+            stress_indices = None
+
         return YieldFunction.compare_2D(
             yld_funcs,
             plane,
@@ -470,4 +481,6 @@ class LoadResponseSet(object):
             up=up,
             show_contour_grid=show_contour_grid,
             join_stress_states=join_stress_states,
+            show_numerical_lankford=show_numerical_lankford,
+            show_numerical_lankford_fit=show_numerical_lankford_fit,
         )
