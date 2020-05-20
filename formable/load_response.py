@@ -55,6 +55,21 @@ class LoadResponse(object):
             msg = ('Pass at least one incremental data array. Allowed data is {}.')
             raise ValueError(msg.format(self.allowed_data_fmt))
 
+        outer_shape = incremental_data[list(incremental_data.keys())[0]].shape[0]
+        err = False
+        for i in incremental_data.values():
+            try:
+                if i.shape[0] != outer_shape:
+                    err = True
+            except AttributeError:
+                err = True
+            if err:
+                msg = ('All `incremental_data` dict values must be Numpy arrays of '
+                       'equal outer shape (corresponding to loading increments).')
+                raise ValueError(msg)
+
+        self._num_increments = outer_shape
+
         self._true_stress = incremental_data.pop('true_stress', None)
         self._equivalent_strain = incremental_data.pop('equivalent_strain', None)
         self._equivalent_plastic_strain = incremental_data.pop(
@@ -67,6 +82,25 @@ class LoadResponse(object):
             unknown_fmt = ', '.join(['"{}"'.format(i) for i in incremental_data])
             msg = ('Unknown incremental data "{}". Allowed incremental data are: {}')
             raise ValueError(msg.format(unknown_fmt, self.allowed_data_fmt))
+
+    @property
+    def num_increments(self):
+        return self._num_increments
+
+    def __len__(self):
+        return self.num_increments
+
+    def __repr__(self):
+        inc_data = []
+        for i in self.incremental_data_names:
+            inc_data.append(f'{i}{getattr(self, i).shape[1:] or (1,)}')
+        out = (
+            f'{self.__class__.__name__}('
+            f'num_increments={len(self)}, '
+            f'incremental_data={inc_data}'
+            f')'
+        )
+        return out
 
     @property
     def incremental_data_names(self):
@@ -208,8 +242,31 @@ class LoadResponseSet(object):
         self.yield_stresses = []        # Appended in `self.calculate_yield_stresses`
         self.yield_functions = []       # Appended in `self.calculate_yield_function_fit`
 
+    def __repr__(self):
+        inc_data = []
+        for i in self.incremental_data_names:
+            inc_data.append(f'{i}{getattr(self.responses[0], i).shape[1:] or (1,)}')
+        out = (
+            f'{self.__class__.__name__}('
+            f'num_responses={len(self)}, '
+            f'incremental_data={inc_data}'
+            f')'
+        )
+        return out
+
     def __len__(self):
         return len(self.responses)
+
+    @property
+    def incremental_data_names(self):
+        """Which of the allowed LoadResponse incremental data do the constituent
+        LoadResponse objects have?"""
+        response = self.responses[0]
+        has = []
+        for allowed in response.ALLOWED_DATA:
+            if getattr(response, allowed) is not None:
+                has.append(allowed)
+        return has
 
     @init_yield_point_criteria
     def calculate_yield_stresses(self, yield_point_criteria):
