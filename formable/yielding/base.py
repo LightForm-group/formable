@@ -854,6 +854,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     'xanchor': 'center',
                     'y': -0.15,
                     'x': 0.5,
+                    'tracegroupgap': 5,
                 },
                 **(layout or {}),
             }
