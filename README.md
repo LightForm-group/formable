@@ -36,7 +36,7 @@ load_set = LoadResponseSet(all_responses)
 A number of yield functions as defined in the literature can be fitted and visualised. As an example, let's visualise the difference between the Von Mises and the Tresca yield criteria:
 
 ```python
-from formable.yielding.yield_functions import VonMises, Tresca
+from formable.yielding.yield_functions import YieldFunction, VonMises, Tresca
 
 von_mises = VonMises(equivalent_stress=70e6)
 tresca = Tresca(equivalent_stress=70e6)
