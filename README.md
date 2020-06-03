@@ -6,6 +6,10 @@
 
 `pip install formable`
 
+To support showing visualisations within a Jupyter notebook, you will also need to make sure Plotly is set up to work within the notebook environment:
+
+`pip install "notebook>=5.3" "ipywidgets>=7.2"`
+
 ## Getting Started
 
 ### `LoadResponse` and `LoadResponseSet`
