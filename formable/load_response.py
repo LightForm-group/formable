@@ -10,7 +10,11 @@ from scipy.optimize import least_squares
 from formable.maths_utils import get_principal_values
 from formable.utils import requires, at_most_one_of
 from formable.yielding import (
-    YieldFunction, YIELD_FUNCTION_MAP, DEF_3D_RES, DEF_2D_RES)
+    YieldFunction,
+    get_yield_function_map,
+    DEF_3D_RES,
+    DEF_2D_RES,
+)
 from formable.yielding.yield_point import (
     YieldPointUnsatisfiedError, init_yield_point_criteria)
 
