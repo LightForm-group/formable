@@ -369,8 +369,8 @@ class LoadResponseSet(object):
         ----------
         yield_function : str or YieldFunction class
             The yield function to fit. Available yield functions can be displayed using:
-                `from formable import AVAILABLE_YIELD_FUNCTIONS`
-                `print(AVAILABLE_YIELD_FUNCTIONS)`
+                `from formable import get_available_yield_functions`
+                `print(get_available_yield_functions())`
         yield_point_criteria_idx : list of (list of int of length 2), optional
             If specified, fit the yield function to only the yield stresses calculated
             from the specified yield point criteria value. By default, None, in which case
@@ -385,6 +385,7 @@ class LoadResponseSet(object):
         """
 
         # Validation:
+        YIELD_FUNCTION_MAP = get_yield_function_map()
         msg = 'Yield function "{}" not known. Available yield functions are: {}'
         available = ', '.join(['"{}"'.format(i) for i in YIELD_FUNCTION_MAP])
         msg = msg.format(yield_function, available)

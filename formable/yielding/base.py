@@ -14,6 +14,7 @@ from plotly.colors import DEFAULT_PLOTLY_COLORS
 from scipy.optimize import least_squares, curve_fit
 
 from formable import utils, maths_utils
+from formable.yielding.map import get_yield_function_map
 
 DEF_3D_RES = 50
 DEF_2D_RES = 100
@@ -86,6 +87,19 @@ class YieldFunction(metaclass=abc.ABCMeta):
             **self.get_parameters(formatted=False)
         )
         return value
+
+    @classmethod
+    def from_name(cls, name, **parameters):
+        'Get a specific yield function from the name and parameters.'
+        YIELD_FUNCTION_MAP = get_yield_function_map()
+        if name not in YIELD_FUNCTION_MAP:
+            available = ', '.join([f'{i!r}' for i in YIELD_FUNCTION_MAP])
+            msg = (f'Yield function "{name}" not known. Available yield functions '
+                   f'are: {available}.')
+            raise ValueError(msg)
+
+        yld_func_class = YIELD_FUNCTION_MAP[name]
+        return yld_func_class(**parameters)
 
     @classmethod
     def from_fit(cls, stress_states, initial_params=None, force_fit=False, **kwargs):

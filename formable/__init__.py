@@ -2,5 +2,5 @@
 
 from formable._version import __version__
 
-from formable.yielding import AVAILABLE_YIELD_FUNCTIONS
+from formable.yielding import get_available_yield_functions
 from formable.load_response import LoadResponse, LoadResponseSet
