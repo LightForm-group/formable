@@ -52,6 +52,8 @@ setup(
         'numpy',
         'plotly',
         'vecmaths',
+        'notebook>=5.3',
+        'ipywidgets>=7.5',
     ],
     project_urls={
         'Github': 'https://github.com/LightForm-group/formable',
