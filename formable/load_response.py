@@ -294,6 +294,7 @@ class LoadResponseSet(object):
                 'response_idx': [],
             }
 
+            num_excluded = 0
             for resp_idx, resp_i in enumerate(self.responses):
 
                 val, _ = resp_i.get_yield_stress(yield_point_criteria, value_idx=ypv_idx)
@@ -301,8 +302,13 @@ class LoadResponseSet(object):
                 if val.size:
                     yield_stress_dict['values'].append(val)
                     yield_stress_dict['response_idx'].append(resp_idx)
+                else:
+                    num_excluded += 1
 
             yield_stress_dict['values'] = np.array(yield_stress_dict['values'])
+
+            print(f'{num_excluded}/{len(self)} responses skipped for yield point '
+                  f'{yield_point_val} from {yield_point_criteria}.')
 
             if not len(yield_stress_dict['values']):
                 msg = (f'No yield stresses were found for yield point criteria '
