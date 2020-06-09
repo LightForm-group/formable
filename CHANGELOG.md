@@ -1,5 +1,25 @@
 # Change Log
 
+## [0.1.3] - 2020.06.09
+
+### Added
+
+- Add a method to estimate the Lankford coefficient via the tangent of the yield surface at a uniaxial stress state: `YieldFunction.get_numerical_lankford`
+- Add options to `YieldFunction.show_2D`, `YieldFunction.compare_2D` and `LoadResponseSet.show_yield_functions_2D` to visualise the tangent and normal to the yield function at a uniaxial stress state.
+- Add incremental data: `equivalent_plastic_strain` and `accumulated_shear_strain`, and associated `YieldPointCriteria` mappings for getting the yield stress (using the same method as that used for `equivalent_stress` [total]).
+- Add `show_stress_states` to `LoadResponseSet.show_yield_functions_3D` and `LoadResponseset.show_yield_functions_2D` to optionally hide stress states.
+- Add option to pass Plotly `layout` parameters to yield function visualisation methods.
+- Add property `num_increments` to `LoadResponse`.
+- Add `repr` to `LoadResponse` and `LoadResponseSet`.
+- Add `YieldFunction.from_name()` class method for generating a yield function from a string name and parameters.
+- Add `LoadResponse.incremental_data` property to return all incremental data as a `dict`.
+
+### Changed
+
+- Check each `incremental_data` array passed to `LoadResponse` has the same outer shape (i.e. same number of increments).
+- `AVAILABLE_YIELD_FUNCTIONS` and `YIELD_FUNCTION_MAP` have been replaced with functions `get_available_yield_functions` and `get_yield_function_map`, respectively.
+- Number of excluded load responses is printed when performing yield function fitting.
+
 ## [0.1.2] - 2020.05.09
 
 ### Fixed
