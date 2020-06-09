@@ -115,6 +115,14 @@ class LoadResponse(object):
                 has.append(allowed)
         return has
 
+    @property
+    def incremental_data(self):
+        'Get all incremental data as a dict.'
+        out = {}
+        for i in self.incremental_data_names:
+            out.update({i: getattr(self, i)})
+        return out
+
     @staticmethod
     def required_incremental_data(cls, analysis_type=None):
         """Get a list of the required incremental data for a given type of analysis."""
