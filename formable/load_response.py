@@ -213,15 +213,18 @@ class LoadResponse(object):
         return yld_stress_principle, good_idx
 
     @requires('true_stress')
-    def is_uniaxial(self, increment=-1, tol=1e-3):
+    def is_uniaxial(self, increment=-1, tol=0.2):
         """Is the specified increment's true stress state approximately uniaxial?"""
 
         princ_stress = self.principal_true_stress[increment]
 
-        # Principal values are ordered largest to smallest, so check the first is much
-        # larger than the other two:
+        # Principal values are ordered largest to smallest, so check the first is larger
+        # than the other two:
         normed = princ_stress / princ_stress[0]
-        if (abs(normed[1]) - tol) <= 0 and (abs(normed[2]) - tol) <= 0:
+        uniaxial_factor = abs(normed[1:3])
+        print(f'Checking if uniaxial with tolerance {tol}. Uniaxial factors are '
+              f'{uniaxial_factor}.')
+        if np.all((uniaxial_factor - tol) <= 0):
             return True
         else:
             return False
