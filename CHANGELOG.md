@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.4] - 2020.07.01
+
+### Changed
+
+- Print out the degree to which the stress state is uniaxial in `LoadResponse.is_uniaxial`.
+
 ## [0.1.3] - 2020.06.09
 
 ### Added
