@@ -213,7 +213,7 @@ class LoadResponse(object):
         return yld_stress_principle, good_idx
 
     @requires('true_stress')
-    def is_uniaxial(self, increment=-1, tol=0.2):
+    def is_uniaxial(self, increment=-1, tol=0.3):
         """Is the specified increment's true stress state approximately uniaxial?"""
 
         princ_stress = self.principal_true_stress[increment]
