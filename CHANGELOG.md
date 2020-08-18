@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.5] - 2020.08.18
+
+### Changed
+
+- Default tolerance for `LoadResponse.is_uniaxial` check loosened to 0.3.
+
 ## [0.1.4] - 2020.07.01
 
 ### Changed
