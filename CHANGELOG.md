@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.6] - 2020.08.22
+
+### Changed
+
+- Add `dump_frequency` to load case generators.
+
 ## [0.1.5] - 2020.08.18
 
 ### Changed
