@@ -9,7 +9,7 @@ from vecmaths.rotation import get_random_rotation_matrix, axang2rotmat
 
 
 def get_load_case_uniaxial(total_time, num_increments, direction, target_strain_rate=None,
-                           target_strain=None, rotation=None):
+                           target_strain=None, rotation=None, dump_frequency=1):
 
     # Validation:
     msg = 'Specify either `target_strain_rate` or `target_strain`.'
@@ -117,13 +117,14 @@ def get_load_case_uniaxial(total_time, num_increments, direction, target_strain_
         'def_grad_aim': def_grad_aim,
         'stress': stress,
         'rotation': rotation,
+        'dump_frequency': dump_frequency,
     }
 
     return load_case
 
 
 def get_load_case_biaxial(total_time, num_increments, direction, target_strain_rate=None,
-                          target_strain=None):
+                          target_strain=None, dump_frequency=1):
 
     # Validation:
     msg = 'Specify either `target_strain_rate` or `target_strain`.'
@@ -223,13 +224,15 @@ def get_load_case_biaxial(total_time, num_increments, direction, target_strain_r
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
         'stress': stress,
+        'dump_frequency': dump_frequency,
     }
 
     return load_case
 
 
 def get_load_case_plane_strain(total_time, num_increments, direction,
-                               target_strain_rate=None, target_strain=None):
+                               target_strain_rate=None, target_strain=None,
+                               dump_frequency=1):
 
     # Validation:
     msg = 'Specify either `target_strain_rate` or `target_strain`.'
@@ -305,13 +308,15 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
         'stress': stress,
+        'dump_frequency': dump_frequency,
     }
 
     return load_case
 
 
 def get_load_case_random_2D(total_time, num_increments, normal_direction,
-                            target_strain_rate=None, target_strain=None):
+                            target_strain_rate=None, target_strain=None,
+                            dump_frequency=1):
 
     def_grad_vals = (np.random.random(4) - 0.5)
 
@@ -422,6 +427,7 @@ def get_load_case_random_2D(total_time, num_increments, normal_direction,
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
         'stress': stress,
+        'dump_frequency': dump_frequency,
     }
 
     return load_case
@@ -429,7 +435,7 @@ def get_load_case_random_2D(total_time, num_increments, normal_direction,
 
 def get_load_case_random_3D(total_time, num_increments, target_strain, rotation=True,
                             rotation_max_angle=10, rotation_load_case=True,
-                            non_random_rotation=None):
+                            non_random_rotation=None, dump_frequency=1):
 
     # Five stretch components, since it's a symmetric matrix and the trace must be zero:
     stretch_comps = (np.random.random((5,)) - 0.5) * target_strain
@@ -480,6 +486,7 @@ def get_load_case_random_3D(total_time, num_increments, target_strain, rotation=
         'def_grad_aim': dg_arr,
         'stress': stress_arr,
         'rotation': rot,
+        'dump_frequency': dump_frequency,
     }
 
     return load_case
