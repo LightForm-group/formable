@@ -331,8 +331,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     'isomax': 0,
                     'surface_count': 1,
                     'colorscale': [
-                        [0, DEFAULT_PLOTLY_COLORS[idx]],
-                        [1, DEFAULT_PLOTLY_COLORS[idx]],
+                        [0, DEFAULT_PLOTLY_COLORS[idx % len(DEFAULT_PLOTLY_COLORS)]],
+                        [1, DEFAULT_PLOTLY_COLORS[idx % len(DEFAULT_PLOTLY_COLORS)]],
                     ],
                     'showscale': False,
                 })
@@ -363,7 +363,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
                             'j': [1, 3],
                             'k': [2, 0],
                             'showlegend': True,
-                            'color': DEFAULT_PLOTLY_COLORS[len(yield_functions) + idx],
+                            'color': DEFAULT_PLOTLY_COLORS[
+                                (len(yield_functions) + idx) % len(DEFAULT_PLOTLY_COLORS)
+                            ],
                             'name': plane_label,
                         }
                     ])
@@ -393,7 +395,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
                                 'name': f'{idx + 1}. Stress data',
                                 'mode': 'markers',
                                 'marker': {
-                                    'color': DEFAULT_PLOTLY_COLORS[idx],
+                                    'color': DEFAULT_PLOTLY_COLORS[
+                                        idx % len(DEFAULT_PLOTLY_COLORS)
+                                    ],
                                 }
                             }
                         )
@@ -572,7 +576,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
                             'mode': 'markers',
                             'marker': {
                                 'size': 4,
-                                'color': DEFAULT_PLOTLY_COLORS[idx],
+                                'color': DEFAULT_PLOTLY_COLORS[
+                                    idx % len(DEFAULT_PLOTLY_COLORS)
+                                ],
                             },
                             'name': 'Tangent fit data',
                             'legendgroup': name,
@@ -608,7 +614,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
                         'y': tangent_line[1],
                         'mode': 'lines',
                         'line': {
-                            'color': DEFAULT_PLOTLY_COLORS[idx],
+                            'color': DEFAULT_PLOTLY_COLORS[
+                                idx % len(DEFAULT_PLOTLY_COLORS)
+                            ],
                         },
                         'showlegend': False,
                         'name': name,
@@ -623,7 +631,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
                         'y': normal_line_seg[1],
                         'mode': 'lines',
                         'line': {
-                            'color': DEFAULT_PLOTLY_COLORS[idx],
+                            'color': DEFAULT_PLOTLY_COLORS[
+                                idx % len(DEFAULT_PLOTLY_COLORS)
+                            ],
                         },
                         'showlegend': False,
                         'name': name,
@@ -646,7 +656,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     # Resolution must be high enough to accurately portray curvature;
                     # so don't rely on smoothing!
                     'smoothing': 0,
-                    'color': DEFAULT_PLOTLY_COLORS[idx],
+                    'color': DEFAULT_PLOTLY_COLORS[
+                        idx % len(DEFAULT_PLOTLY_COLORS)
+                    ],
                 },
                 'showscale': False,
                 'showlegend': True,
@@ -692,7 +704,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
             for idx, proj in enumerate(proj_stresses):
                 if proj is not None:
                     color_dim = np.abs(proj['dist']) / np.max(np.abs(proj['dist']))
-                    base_col = DEFAULT_PLOTLY_COLORS[idx]
+                    base_col = DEFAULT_PLOTLY_COLORS[idx % len(DEFAULT_PLOTLY_COLORS)]
                     base_col_rgb = utils.parse_rgb_str(base_col)
 
                     fig_data.append({
