@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.7] - 2020.09.17
+
+### Fixed
+
+- Fix plot line colouring for many traces (more than Plotly default colour list)
+
 ## [0.1.6] - 2020.08.22
 
 ### Changed
