@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.9] - 2020.11.18
+
+### Fixed
+
+- Add missing import to `formable.utils`.
+
 ## [0.1.8] - 2020.11.18
 
 ### Added
