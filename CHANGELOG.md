@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.8] - 2020.11.18
+
+### Added
+
+- Include `tensile_test` module from `tensile_test` package.
+
 ## [0.1.7] - 2020.09.17
 
 ### Fixed
