@@ -2,6 +2,7 @@
 
 import functools
 import numpy as np
+from pathlib import Path
 
 
 def requires(incremental_data_name):
