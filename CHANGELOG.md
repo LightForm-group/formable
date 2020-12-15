@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.10] - 2020.12.15
+
+### Added
+
+- Add new module, `levenberg_marquardt` for fitting single crystal parameters.
+
 ## [0.1.9] - 2020.11.18
 
 ### Fixed
