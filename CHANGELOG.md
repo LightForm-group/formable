@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.11] - 2020.12.16
+
+### Fixed
+
+- Set float values in `get_new_single_crystal_params`.
+
 ## [0.1.10] - 2020.12.15
 
 ### Added
