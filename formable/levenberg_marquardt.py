@@ -344,6 +344,7 @@ class LMFitter(object):
         'Represent as a JSON-compatible dict.'
         out = {
             'exp_tensile_test': self.exp_tensile_test.to_dict(),
+            'single_crystal_parameters': self.single_crystal_parameters,
             'fitting_params': [i.to_dict() for i in self.fitting_params],
             'optimisations': [i.to_dict() for i in self.optimisations],
             'initial_damping': self.initial_damping,
