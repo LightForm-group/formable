@@ -313,7 +313,8 @@ class LMFitter(object):
             The experimental data to which the parameters should be fit.            
         single_crystal_parameters : dict or list
             Dict or list of parameters that define the material properties in whatever
-            simulation software is chosen. If a dict, it may be arbitrarily nested.
+            simulation software is chosen. If a dict, it may be arbitrarily nested. Note:
+            this should be JSON-compatible (i.e. no Numpy floats).
         fitting_params : list of FittingParameter
             List of FittingParameter objects, one for each parameter to be fit. The
             `address` attribute of each FittingParameter must point to a valid location
@@ -363,30 +364,40 @@ class LMFitter(object):
         return json_path
 
     @classmethod
+    def from_dict(cls, lm_fitter_dict):
+        'Load an LMFitter object from a JSON-compatbile dict.'
+
+        lm_fitter_dict['exp_tensile_test'] = TensileTest(
+            **lm_fitter_dict['exp_tensile_test']
+        )
+
+        lm_fitter_dict['fitting_params'] = [
+            FittingParameter(**i)
+            for i in lm_fitter_dict['fitting_params']
+        ]
+
+        for idx, i in enumerate(lm_fitter_dict['optimisations']):
+            i.update({
+                'lm_fitter': None,
+                '_delay_validation': True,
+                'sim_tensile_tests': [TensileTest(**j) for j in i['sim_tensile_tests']]
+            })
+            lm_fitter_dict['optimisations'][idx] = LMFitterOptimisation(**i)
+
+        lm_fitter = cls(**lm_fitter_dict)
+        for opt in lm_fitter.optimisations:
+            opt._validate(lm_fitter)
+
+        return lm_fitter
+
+    @classmethod
     def from_json_file(cls, json_path):
         'Load an LMFitter from a JSON file.'
 
         with Path(json_path).open() as handle:
             contents = json.load(handle)
 
-        contents['exp_tensile_test'] = TensileTest(**contents['exp_tensile_test'])
-
-        contents['fitting_params'] = [
-            FittingParameter(**i)
-            for i in contents['fitting_params']
-        ]
-
-        for idx, i in enumerate(contents['optimisations']):
-            i.update({
-                'lm_fitter': None,
-                '_delay_validation': True,
-                'sim_tensile_tests': [TensileTest(**j) for j in i['sim_tensile_tests']]
-            })
-            contents['optimisations'][idx] = LMFitterOptimisation(**i)
-
-        lm_fitter = cls(**contents)
-        for opt in lm_fitter.optimisations:
-            opt._validate(lm_fitter)
+        lm_fitter = LMFitter.from_dict(contents)
 
         return lm_fitter
 
