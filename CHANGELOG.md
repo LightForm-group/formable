@@ -1,5 +1,15 @@
 # Change Log
 
+## [0.1.12] - 2020.12.16
+
+### Added
+
+- Add `LMFitter.from_dict`
+
+### Fixed
+
+- Add `single_crystal_parameters` to returned dict of `LMFitter.to_dict`.
+
 ## [0.1.11] - 2020.12.16
 
 ### Fixed
