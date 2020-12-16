@@ -452,7 +452,7 @@ class LMFitter(object):
                 new_params,
                 fit_param.address[-1],
                 fit_param.address[:-1],
-                fit_param.values[fitting_idx]
+                float(fit_param.values[fitting_idx]),
             )
         return new_params
 
