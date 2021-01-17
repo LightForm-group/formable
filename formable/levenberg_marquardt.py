@@ -367,6 +367,9 @@ class LMFitter(object):
     def from_dict(cls, lm_fitter_dict):
         'Load an LMFitter object from a JSON-compatbile dict.'
 
+        # Don't modify the original:
+        lm_fitter_dict = copy.deepcopy(lm_fitter_dict)
+
         lm_fitter_dict['exp_tensile_test'] = TensileTest(
             **lm_fitter_dict['exp_tensile_test']
         )
