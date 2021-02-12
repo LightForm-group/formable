@@ -358,7 +358,7 @@ class TensileTest(object):
                 strain = self.true_strain
 
             fig.data[0].x = strain
-            fig.data[0].y = stress
+            fig.data[0].y = stress / 1e6
             fig.layout.xaxis.title.text = ss_type.value + ' strain, ε'
             fig.layout.yaxis.title.text = ss_type.value + ' stress, σ / MPa'
 
@@ -366,7 +366,7 @@ class TensileTest(object):
         data = [
             {
                 'x': self.eng_strain,
-                'y': self.eng_stress,
+                'y': self.eng_stress / 1e6,
                 'name': self.meta.get('name') or '',
                 'line': {
                     'color': DEFAULT_PLOTLY_COLORS[0],
@@ -385,8 +385,8 @@ class TensileTest(object):
             },
             'yaxis': {
                 'title': 'Engineering stress, σ / MPa',
-                'range': [-TensileTest.FIG_PAD[1] * 1e6,
-                          TensileTest.FIG_PAD[1] * 1e6 + self.max_stress],
+                'range': [-TensileTest.FIG_PAD[1],
+                          TensileTest.FIG_PAD[1] + self.max_stress / 1e6],
             },
         }
         fig_wig = go.FigureWidget(data=data, layout=layout)

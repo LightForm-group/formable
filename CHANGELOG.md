@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.1.13] - 2021.xx.xx
+
+### Changed
+
+- Do not modify input dict to `levenberg_marquardt.LMFitter.from_dict`.
+- Fix bug in `TensileTest.show()` stress scale.
+
 ## [0.1.12] - 2020.12.16
 
 ### Added
