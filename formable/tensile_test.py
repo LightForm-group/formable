@@ -34,6 +34,7 @@ class TensileTest(object):
     DEFAULT_TAYLOR_FACTOR = 2.5
     DEFAULT_YOUNGS_MOD = 79  # GPa
     DEFAULT_PLASTIC_RANGE_START = 0.02
+    DEFAULT_ELASTIC_RANGE = [0,0.002]
     FIG_WIDTH = 380
     FIG_HEIGHT = 280
     FIG_MARG = {
@@ -46,7 +47,7 @@ class TensileTest(object):
 
     def __init__(self, eng_stress=None, eng_strain=None, true_stress=None,
                  true_strain=None, youngs_modulus=None, taylor_factor=None,
-                 plastic_range=None, meta=None):
+                 plastic_range=None, elastic_range=None, meta=None):
 
         msg = ('Specify (`eng_stress` and `eng_strain`) or (`true_stress` and '
                '`true_strain`)')
@@ -73,6 +74,10 @@ class TensileTest(object):
 
         self.plastic_range = plastic_range
         self._plastic_range_idx = None
+        self.elastic_range = elastic_range or TensileTest.DEFAULT_ELASTIC_RANGE
+        self._elastic_range_idx = None
+        self._elastic_stress = None
+        self._elastic_strain = None       
         self._plastic_stress = None
         self._plastic_strain = None
 
@@ -154,7 +159,6 @@ class TensileTest(object):
 
     def _set_plastic_stress_strain(self):
         'Use `plastic_range` to set plastic stress/strain.'
-
         idx = [find_nearest_index(self.true_strain, self.plastic_range[i])
                for i in [0, 1]]
 
@@ -165,6 +169,18 @@ class TensileTest(object):
         self._plastic_strain = strain_sub - elastic_strain
         self._plastic_stress = stress_sub
         self._plastic_range_idx = idx
+        
+    def _set_elastic_stress_strain(self):
+        'Use `elastic_range` to set elastic stress/strain.'
+        idx = [find_nearest_index(self.true_strain, self.elastic_range[i])
+               for i in [0, 1]]
+
+        stress_sub = self.true_stress[slice(*idx)]
+        strain_sub = self.true_strain[slice(*idx)]
+
+        self._elastic_strain = strain_sub
+        self._elastic_stress = stress_sub
+        self._elastic_range_idx = idx      
 
     def _set_shear_stress_strain(self):
         sstress, sstrain = self.get_shear_stress_strain(self.taylor_factor)
