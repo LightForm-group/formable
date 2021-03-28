@@ -7,6 +7,10 @@
 - Do not modify input dict to `levenberg_marquardt.LMFitter.from_dict`.
 - Fix bug in `TensileTest.show()` stress scale.
 
+### Added
+
+- Add `to_dict` and `from_dict` methods to `LoadResponseSet`.
+
 ## [0.1.12] - 2020.12.16
 
 ### Added

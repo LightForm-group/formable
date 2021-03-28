@@ -214,6 +214,10 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
         return out
 
+    @property
+    def name(self):
+        return self.__class__.__name__
+
     @classmethod
     def compare_3D(cls, yield_functions, normalise=True, resolution=DEF_3D_RES,
                    equivalent_stress=None, min_stress=None, max_stress=None,

@@ -79,8 +79,6 @@ class YieldPointCriteria(object):
         self.source = source or threshold
         self.kwargs = kwargs
 
-        self.source_data = None
-
         # TODO: source must be an allowed LoadResponse incremental_data
 
     def __len__(self):
@@ -91,6 +89,16 @@ class YieldPointCriteria(object):
                 f'threshold={self.threshold!r}, '
                 f'values={self.values!r}, '
                 f'source={self.source!r})')
+
+    def to_dict(self):
+        """Generate a dict representation."""
+        out = {
+            'threshold': self.threshold,
+            'values': self.values,
+            'source': self.source,
+            **self.kwargs,
+        }
+        return out
 
     def get_formatted(self, values_idx=None):
         if values_idx:

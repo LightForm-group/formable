@@ -1,6 +1,7 @@
 """`formable.load_response.py`"""
 
 import copy
+from collections import namedtuple
 from pathlib import Path
 from warnings import warn
 
@@ -16,7 +17,10 @@ from formable.yielding import (
     DEF_2D_RES,
 )
 from formable.yielding.yield_point import (
-    YieldPointUnsatisfiedError, init_yield_point_criteria)
+    YieldPointUnsatisfiedError,
+    init_yield_point_criteria,
+    YieldPointCriteria
+)
 
 
 class InhomogeneousDataError(Exception):
@@ -62,6 +66,8 @@ class LoadResponse(object):
         outer_shape = incremental_data[list(incremental_data.keys())[0]].shape[0]
         err = False
         for i in incremental_data.values():
+            if i is None:
+                continue
             try:
                 if i.shape[0] != outer_shape:
                     err = True
@@ -106,6 +112,11 @@ class LoadResponse(object):
         )
         return out
 
+    def to_dict(self):
+        """Generate a dict representation."""
+
+        return self.incremental_data._asdict()
+
     @property
     def incremental_data_names(self):
         'Which of the allowed incremental data does this LoadResponse have?'
@@ -118,10 +129,10 @@ class LoadResponse(object):
     @property
     def incremental_data(self):
         'Get all incremental data as a dict.'
-        out = {}
+        out = {i: None for i in LoadResponse.ALLOWED_DATA}
         for i in self.incremental_data_names:
             out.update({i: getattr(self, i)})
-        return out
+        return IncrementalData(**out)
 
     @staticmethod
     def required_incremental_data(cls, analysis_type=None):
@@ -237,11 +248,15 @@ class LoadResponseSet(object):
 
         Parameters
         ----------
-        load_responses : list of LoadResponse
+        load_responses : list of (LoadResponse or dict)
             All LoadResponse objects within the list must have the same set of specified
             incremental data.
 
         """
+
+        for idx, response in enumerate(load_responses):
+            if not isinstance(response, LoadResponse):
+                load_responses[idx] = LoadResponse(**response)
 
         # Validate:
         inc_data = load_responses[0].incremental_data_names
@@ -253,9 +268,10 @@ class LoadResponseSet(object):
 
         self.responses = load_responses
 
-        self.yield_point_criteria = []  # Appended in `self.calculate_yield_stresses`
-        self.yield_stresses = []        # Appended in `self.calculate_yield_stresses`
-        self.yield_functions = []       # Appended in `self.calculate_yield_function_fit`
+        # All appended to in given methods, or in self.from_dict:
+        self.yield_point_criteria = []  # `self.calculate_yield_stresses`
+        self.yield_stresses = []        # `self.calculate_yield_stresses`
+        self.yield_functions = []       # `self.calculate_yield_function_fit`
 
     def __repr__(self):
         inc_data = []
@@ -271,6 +287,67 @@ class LoadResponseSet(object):
 
     def __len__(self):
         return len(self.responses)
+
+    def to_dict(self):
+        """Generate a dict representation."""
+        out = {
+            'responses': [i.to_dict() for i in self.responses],
+            'yield_point_criteria': [i.to_dict() for i in self.yield_point_criteria],
+            'yield_stresses': self.yield_stresses,
+            'yield_functions': [
+                {
+                    'YPC_idx': i['YPC_idx'],
+                    'YPC_value_idx': i['YPC_value_idx'],
+                    'yield_stress_idx': i['yield_stress_idx'],
+                    'yield_function': {
+                        'name': i['yield_function'].name,
+                        **i['yield_function'].get_parameters(),
+                    }
+                }
+                for i in self.yield_functions
+            ],
+        }
+        return out
+
+    @classmethod
+    def from_dict(cls, dct):
+        """Reconstitute a LoadResponseSet object from a dict."""
+
+        obj = cls(load_responses=dct['responses'])
+
+        # Reconstitute a pre-existing `LoadResponseSet`:
+        if 'yield_stresses' in dct:
+
+            for yld_stress in dct['yield_stresses']:
+                if not isinstance(yld_stress, YieldStresses):
+                    yld_stress = YieldStresses(**yld_stress)
+                    obj.yield_stresses.append(yld_stress)
+
+            if 'yield_point_criteria' not in dct:
+                msg = ('Yield stresses are defined according to one or more yield point '
+                       'criteria, so `yield_point_criteria` must be given.')
+                raise ValueError(msg)
+            else:
+                for ypc in dct['yield_point_criteria']:
+                    if not isinstance(ypc, YieldPointCriteria):
+                        ypc = YieldPointCriteria(**ypc)
+                    obj.yield_point_criteria.append(ypc)
+
+            if dct.get('yield_functions'):
+                for yld_func in dct['yield_functions']:
+                    if not isinstance(yld_func['yield_function'], YieldFunction):
+                        yld_func_obj = YieldFunction.from_name(
+                            **yld_func['yield_function']
+                        )
+                        yld_func_dict = {
+                            'YPC_idx': yld_func['YPC_idx'],
+                            'YPC_value_idx': yld_func['YPC_value_idx'],
+                            'yield_stress_idx': yld_func['yield_stress_idx'],
+                            'yield_function': yld_func_obj,
+                        }
+                    obj.yield_functions.append(yld_func_dict)
+
+        return obj
 
     @property
     def incremental_data_names(self):
@@ -326,7 +403,7 @@ class LoadResponseSet(object):
                        f'value {yield_point_val}.')
                 raise ValueError(msg)
 
-            self.yield_stresses.append(yield_stress_dict)
+            self.yield_stresses.append(YieldStresses(**yield_stress_dict))
 
         self.yield_point_criteria.append(yield_point_criteria)
 
@@ -436,8 +513,8 @@ class LoadResponseSet(object):
             yield_stress = None
             yield_stress_idx = None
             for ys_idx, ys in enumerate(self.yield_stresses):
-                if ys['YPC_idx'] == ypc_idx and ys['YPC_value_idx'] == ypc_val_idx:
-                    yield_stress = ys['values']
+                if ys.YPC_idx == ypc_idx and ys.YPC_value_idx == ypc_val_idx:
+                    yield_stress = ys.values
                     yield_stress_idx = ys_idx
                     break
 
@@ -565,3 +642,12 @@ class LoadResponseSet(object):
             show_numerical_lankford_fit=show_numerical_lankford_fit,
             layout=layout,
         )
+
+    def show_yield_stresses_2D(self):
+        pass
+
+
+IncrementalData = namedtuple('IncrementalData', LoadResponse.ALLOWED_DATA)
+YieldStresses = namedtuple(
+    'YieldStresses', ['YPC_idx', 'YPC_value_idx', 'values', 'response_idx']
+)
