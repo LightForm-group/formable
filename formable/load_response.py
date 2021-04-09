@@ -115,7 +115,7 @@ class LoadResponse(object):
     def to_dict(self):
         """Generate a dict representation."""
 
-        return self.incremental_data._asdict()
+        return dict(self.incremental_data._asdict())
 
     @property
     def incremental_data_names(self):
@@ -269,9 +269,9 @@ class LoadResponseSet(object):
         self.responses = load_responses
 
         # All appended to in given methods, or in self.from_dict:
-        self.yield_point_criteria = []  # `self.calculate_yield_stresses`
-        self.yield_stresses = []        # `self.calculate_yield_stresses`
-        self.yield_functions = []       # `self.calculate_yield_function_fit`
+        self.yield_point_criteria = []      # `self.calculate_yield_stresses`
+        self.yield_stresses = []            # `self.calculate_yield_stresses`
+        self.fitted_yield_functions = []    # `self.calculate_yield_function_fit`
 
     def __repr__(self):
         inc_data = []
@@ -293,8 +293,8 @@ class LoadResponseSet(object):
         out = {
             'responses': [i.to_dict() for i in self.responses],
             'yield_point_criteria': [i.to_dict() for i in self.yield_point_criteria],
-            'yield_stresses': self.yield_stresses,
-            'yield_functions': [
+            'yield_stresses': [dict(i._asdict()) for i in self.yield_stresses],
+            'fitted_yield_functions': [
                 {
                     'YPC_idx': i['YPC_idx'],
                     'YPC_value_idx': i['YPC_value_idx'],
@@ -302,9 +302,10 @@ class LoadResponseSet(object):
                     'yield_function': {
                         'name': i['yield_function'].name,
                         **i['yield_function'].get_parameters(),
+                        'fit': i['yield_function'].fit,
                     }
                 }
-                for i in self.yield_functions
+                for i in self.fitted_yield_functions
             ],
         }
         return out
@@ -313,7 +314,7 @@ class LoadResponseSet(object):
     def from_dict(cls, dct):
         """Reconstitute a LoadResponseSet object from a dict."""
 
-        obj = cls(load_responses=dct['responses'])
+        obj = cls(load_responses=copy.deepcopy(dct['responses']))
 
         # Reconstitute a pre-existing `LoadResponseSet`:
         if 'yield_stresses' in dct:
@@ -333,8 +334,8 @@ class LoadResponseSet(object):
                         ypc = YieldPointCriteria(**ypc)
                     obj.yield_point_criteria.append(ypc)
 
-            if dct.get('yield_functions'):
-                for yld_func in dct['yield_functions']:
+            if dct.get('fitted_yield_functions'):
+                for yld_func in dct['fitted_yield_functions']:
                     if not isinstance(yld_func['yield_function'], YieldFunction):
                         yld_func_obj = YieldFunction.from_name(
                             **yld_func['yield_function']
@@ -345,7 +346,7 @@ class LoadResponseSet(object):
                             'yield_stress_idx': yld_func['yield_stress_idx'],
                             'yield_function': yld_func_obj,
                         }
-                    obj.yield_functions.append(yld_func_dict)
+                    obj.fitted_yield_functions.append(yld_func_dict)
 
         return obj
 
@@ -548,12 +549,12 @@ class LoadResponseSet(object):
             yld_func_obj.yield_point = ypc.get_formatted(values_idx=ypc_val_idx)
             yield_func_dict['yield_function'] = yld_func_obj
 
-            self.yield_functions.append(yield_func_dict)
+            self.fitted_yield_functions.append(yield_func_dict)
 
     def remove_yield_function_fits(self):
         'Remove all yield function fits'
 
-        self.yield_functions = []
+        self.fitted_yield_functions = []
 
     def show_yield_functions_3D(self, normalise=True, resolution=DEF_3D_RES,
                                 equivalent_stress=None, min_stress=None, max_stress=None,
@@ -562,17 +563,17 @@ class LoadResponseSet(object):
                                 show_contour_grid=False, layout=None,):
         'Visualise all fitted yield functions and data in 3D.'
 
-        if not self.yield_functions:
+        if not self.fitted_yield_functions:
             raise ValueError('No yield functions have been fitted to the load set.')
 
         yld_funcs = []
         yld_stresses = []
         stress_indices = []
-        for yld_func_dict in self.yield_functions:
+        for yld_func_dict in self.fitted_yield_functions:
             yld_funcs.append(yld_func_dict['yield_function'])
             yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]
-            yld_stress_vals = yld_stress['values']
-            resp_idx = yld_stress['response_idx']
+            yld_stress_vals = yld_stress.values
+            resp_idx = yld_stress.response_idx
             yld_stress_principal = get_principal_values(yld_stress_vals)
             yld_stresses.append(yld_stress_principal)
             stress_indices.append(resp_idx)
@@ -606,17 +607,17 @@ class LoadResponseSet(object):
                                 show_numerical_lankford_fit=False, layout=None):
         'Visualise all fitted yield functions and data in 2D.'
 
-        if not self.yield_functions:
+        if not self.fitted_yield_functions:
             raise ValueError('No yield functions have been fitted to the load set.')
 
         yld_funcs = []
         yld_stresses = []
         stress_indices = []
-        for yld_func_dict in self.yield_functions:
+        for yld_func_dict in self.fitted_yield_functions:
             yld_funcs.append(yld_func_dict['yield_function'])
             yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]
-            yld_stress_vals = yld_stress['values']
-            resp_idx = yld_stress['response_idx']
+            yld_stress_vals = yld_stress.values
+            resp_idx = yld_stress.response_idx
             yld_stress_principal = get_principal_values(yld_stress_vals)
             yld_stresses.append(yld_stress_principal)
             stress_indices.append(resp_idx)

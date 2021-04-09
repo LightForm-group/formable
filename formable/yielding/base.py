@@ -89,7 +89,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         return value
 
     @classmethod
-    def from_name(cls, name, **parameters):
+    def from_name(cls, name, fit_info=None, **parameters):
         'Get a specific yield function from the name and parameters.'
         YIELD_FUNCTION_MAP = get_yield_function_map()
         if name not in YIELD_FUNCTION_MAP:
@@ -99,7 +99,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
             raise ValueError(msg)
 
         yld_func_class = YIELD_FUNCTION_MAP[name]
-        return yld_func_class(**parameters)
+        yld_func = yld_func_class(**parameters)
+        yld_func.fit_info = fit_info
+        return yld_func
 
     @classmethod
     def from_fit(cls, stress_states, initial_params=None, force_fit=False, **kwargs):
@@ -142,7 +144,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
             # Construct yield function, but no need to fit:
             yield_function = cls(**kwargs)
-            fit = None
+            fit_info = None
 
         else:
 
@@ -159,21 +161,21 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 idx = fitting_param_names.index('equivalent_stress')
                 initial_params_all[idx] = 50e6
 
-            fit = least_squares(
+            fit_info = least_squares(
                 cls.residual,
                 initial_params_all,
                 kwargs=dict(
                     stress_states=stress_states,
                     fitting_param_names=fitting_param_names,
                     **kwargs,
-                )
+                ),
             )
 
-            parameters = dict(zip(fitting_param_names, fit.x))
+            parameters = dict(zip(fitting_param_names, fit_info.x))
             parameters.update(**kwargs)
             yield_function = cls(**parameters)
 
-        yield_function.fit = fit
+        yield_function.fit_info = fit_info
 
         return yield_function
 
