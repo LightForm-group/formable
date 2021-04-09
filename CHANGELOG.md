@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.14] - 2021.04.xx
+
+### Added
+
+- Add ability to specify fitting bounds and other optimisation parameters to `YieldFunction.from_fit()`.
+
 ## [0.1.13] - 2021.03.28
 
 ### Changed

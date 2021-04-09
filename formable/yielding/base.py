@@ -108,7 +108,8 @@ class YieldFunction(metaclass=abc.ABCMeta):
         return yld_func
 
     @classmethod
-    def from_fit(cls, stress_states, initial_params=None, force_fit=False, **kwargs):
+    def from_fit(cls, stress_states, initial_params=None, force_fit=False,
+                 opt_parameters=None, **fixed_parameters):
         """Fit the yield function to yield stress states.
 
         Parameters
@@ -116,38 +117,57 @@ class YieldFunction(metaclass=abc.ABCMeta):
         stress_states : ndarray of shape (N, 3, 3)
         initial_params : dict
             Any initial guesses for the fitting parameters. Mutually exclusive with
-            additional keyword arguments passed, which are considered to be fixed.
+            additional keyword arguments (**fixed_parameters) passed, which are considered
+            to be fixed.
         force_fit : bool, optional
             If False, do not fit if there is insufficient input data. False by default.
-        kwargs : dict
+        opt_parameters : dict, optional
+            Optimisation parameters. Dict with any of the keys:
+                default_bounds : list of length two, optional
+                    The bounds applied to all non-fixed yield function parameters by
+                    default.
+                bounds : dict, optional
+                    Dict of bounds for individual named parameters. These bounds take
+                    precedence over `default_bounds`.
+                **kwargs : dict
+                    Other parameters to be passed to the SciPy least_squares function.
+
+        **fixed_parameters : dict
             Additional parameters passed to this method will be fixed during the fit.
 
         Returns
         -------
         yield_function : YieldFunction
-            The fitted yield function.
+            The fitted yield function, with a populated `fit_info` attribute if a fit
+            was performed.
 
         """
 
-        fitting_param_names = [i for i in cls.PARAMETERS if i not in kwargs]
+        fitting_param_names = [i for i in cls.PARAMETERS if i not in fixed_parameters]
         initial_params_all = np.ones(len(fitting_param_names))
 
         initial_params = initial_params or {}
 
-        if initial_params:
-            for k, initial_guess in initial_params.items():
-                if k not in fitting_param_names:
-                    msg = (f'Initial guess specified for parameter "{k}", but this '
-                           'parameter has also been specified as a keyword argument, '
-                           'indicating it should be fixed.')
+        for param_name, initial_guess in initial_params.items():
+            if param_name not in fitting_param_names:
+                if param_name not in cls.PARAMETERS:
+                    msg = (f'Initial guess specified for parameter "{param_name}", but '
+                           f'this parameter does not exist for the specified yield '
+                           f'function, "{cls.__name__}".')
                     raise ValueError(msg)
-                param_idx = fitting_param_names.index(k)
-                initial_params_all[param_idx] = initial_guess
+                elif param_name in fixed_parameters:
+                    msg = (f'Initial guess specified for parameter "{param_name}", but '
+                           f'this parameter has also been specified as a keyword '
+                           f'argument, indicating it should be fixed.')
+                    raise ValueError(msg)
+
+            param_idx = fitting_param_names.index(param_name)
+            initial_params_all[param_idx] = initial_guess
 
         if not fitting_param_names:
 
             # Construct yield function, but no need to fit:
-            yield_function = cls(**kwargs)
+            yield_function = cls(**fixed_parameters)
             fit_info = None
 
         else:
@@ -165,18 +185,56 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 idx = fitting_param_names.index('equivalent_stress')
                 initial_params_all[idx] = 50e6
 
+            bounds_all = (-np.inf, +np.inf)
+            if opt_parameters:
+
+                def_bounds = opt_parameters.pop('default_bounds')
+                bounds_dict = opt_parameters.pop('bounds')
+
+                if def_bounds:
+                    bounds_all = [
+                        [def_bounds[0]] * len(initial_params_all),
+                        [def_bounds[1]] * len(initial_params_all),
+                    ]
+                else:
+                    bounds_all = [
+                        [-np.inf] * len(initial_params_all),
+                        [+np.inf] * len(initial_params_all),
+                    ]
+
+                if bounds_dict:
+                    for param_name, param_bounds in bounds_dict.items():
+
+                        if param_name not in cls.PARAMETERS:
+                            msg = (f'Fitting bounds specified for parameter '
+                                   f'"{param_name}", but this parameter does not exist '
+                                   f'for the specified yield function, "{cls.__name__}".')
+                            raise ValueError(msg)
+                        elif param_name in fixed_parameters:
+                            msg = (f'Fitting bounds specified for parameter '
+                                   f'"{param_name}", but this parameter has also been '
+                                   f'specified as a keyword argument, indicating it '
+                                   f'should be fixed.')
+                            raise ValueError(msg)
+
+                        param_idx = fitting_param_names.index(param_name)
+                        bounds_all[0][param_idx] = param_bounds[0]
+                        bounds_all[1][param_idx] = param_bounds[1]
+
             fit_info = least_squares(
                 cls.residual,
                 initial_params_all,
+                bounds=tuple(bounds_all),
                 kwargs=dict(
                     stress_states=stress_states,
                     fitting_param_names=fitting_param_names,
-                    **kwargs,
+                    **fixed_parameters,
                 ),
+                **(opt_parameters or {}),
             )
 
             parameters = dict(zip(fitting_param_names, fit_info.x))
-            parameters.update(**kwargs)
+            parameters.update(**fixed_parameters)
             yield_function = cls(**parameters)
 
         yield_function.fit_info = fit_info
