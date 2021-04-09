@@ -302,7 +302,7 @@ class LoadResponseSet(object):
                     'yield_function': {
                         'name': i['yield_function'].name,
                         **i['yield_function'].get_parameters(),
-                        'fit': i['yield_function'].fit,
+                        'fit_info': dict(i['yield_function'].fit_info),
                     }
                 }
                 for i in self.fitted_yield_functions

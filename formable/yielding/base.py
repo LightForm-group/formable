@@ -11,7 +11,7 @@ import functools
 import numpy as np
 from plotly import graph_objects
 from plotly.colors import DEFAULT_PLOTLY_COLORS
-from scipy.optimize import least_squares, curve_fit
+from scipy.optimize import least_squares, curve_fit, OptimizeResult
 
 from formable import utils, maths_utils
 from formable.yielding.map import get_yield_function_map
@@ -98,9 +98,13 @@ class YieldFunction(metaclass=abc.ABCMeta):
                    f'are: {available}.')
             raise ValueError(msg)
 
+        if fit_info:
+            fit_info = OptimizeResult(**fit_info)
+
         yld_func_class = YIELD_FUNCTION_MAP[name]
         yld_func = yld_func_class(**parameters)
         yld_func.fit_info = fit_info
+
         return yld_func
 
     @classmethod
