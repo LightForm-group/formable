@@ -109,7 +109,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
     @classmethod
     def from_fit(cls, stress_states, initial_params=None, force_fit=False,
-                 opt_parameters=None, **fixed_parameters):
+                 opt_params=None, **fixed_params):
         """Fit the yield function to yield stress states.
 
         Parameters
@@ -117,11 +117,11 @@ class YieldFunction(metaclass=abc.ABCMeta):
         stress_states : ndarray of shape (N, 3, 3)
         initial_params : dict
             Any initial guesses for the fitting parameters. Mutually exclusive with
-            additional keyword arguments (**fixed_parameters) passed, which are considered
+            additional keyword arguments (**fixed_params) passed, which are considered
             to be fixed.
         force_fit : bool, optional
             If False, do not fit if there is insufficient input data. False by default.
-        opt_parameters : dict, optional
+        opt_params : dict, optional
             Optimisation parameters. Dict with any of the keys:
                 default_bounds : list of length two, optional
                     The bounds applied to all non-fixed yield function parameters by
@@ -132,7 +132,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 **kwargs : dict
                     Other parameters to be passed to the SciPy least_squares function.
 
-        **fixed_parameters : dict
+        **fixed_params : dict
             Additional parameters passed to this method will be fixed during the fit.
 
         Returns
@@ -143,7 +143,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
         """
 
-        fitting_param_names = [i for i in cls.PARAMETERS if i not in fixed_parameters]
+        fitting_param_names = [i for i in cls.PARAMETERS if i not in fixed_params]
         initial_params_all = np.ones(len(fitting_param_names))
 
         initial_params = initial_params or {}
@@ -155,7 +155,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                            f'this parameter does not exist for the specified yield '
                            f'function, "{cls.__name__}".')
                     raise ValueError(msg)
-                elif param_name in fixed_parameters:
+                elif param_name in fixed_params:
                     msg = (f'Initial guess specified for parameter "{param_name}", but '
                            f'this parameter has also been specified as a keyword '
                            f'argument, indicating it should be fixed.')
@@ -167,7 +167,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         if not fitting_param_names:
 
             # Construct yield function, but no need to fit:
-            yield_function = cls(**fixed_parameters)
+            yield_function = cls(**fixed_params)
             fit_info = None
 
         else:
@@ -186,10 +186,10 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 initial_params_all[idx] = 50e6
 
             bounds_all = (-np.inf, +np.inf)
-            if opt_parameters:
+            if opt_params:
 
-                def_bounds = opt_parameters.pop('default_bounds')
-                bounds_dict = opt_parameters.pop('bounds')
+                def_bounds = opt_params.pop('default_bounds')
+                bounds_dict = opt_params.pop('bounds')
 
                 if def_bounds:
                     bounds_all = [
@@ -210,7 +210,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                                    f'"{param_name}", but this parameter does not exist '
                                    f'for the specified yield function, "{cls.__name__}".')
                             raise ValueError(msg)
-                        elif param_name in fixed_parameters:
+                        elif param_name in fixed_params:
                             msg = (f'Fitting bounds specified for parameter '
                                    f'"{param_name}", but this parameter has also been '
                                    f'specified as a keyword argument, indicating it '
@@ -228,13 +228,13 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 kwargs=dict(
                     stress_states=stress_states,
                     fitting_param_names=fitting_param_names,
-                    **fixed_parameters,
+                    **fixed_params,
                 ),
-                **(opt_parameters or {}),
+                **(opt_params or {}),
             )
 
             parameters = dict(zip(fitting_param_names, fit_info.x))
-            parameters.update(**fixed_parameters)
+            parameters.update(**fixed_params)
             yield_function = cls(**parameters)
 
         yield_function.fit_info = fit_info

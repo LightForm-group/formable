@@ -411,14 +411,14 @@ class LoadResponseSet(object):
     def _validate_yield_function_parameters(self, yield_function,
                                             yield_point_criteria_idx,
                                             yield_point_criteria_value_idx,
-                                            uniaxial_response, **kwargs):
+                                            uniaxial_response, **fixed_params):
 
         ypc = self.yield_point_criteria[yield_point_criteria_idx]
 
         uniaxial_eq_stress = None
         if 'equivalent_stress' in yield_function.PARAMETERS:
 
-            if 'equivalent_stress' not in kwargs:
+            if 'equivalent_stress' not in fixed_params:
 
                 if uniaxial_response is not None:
                     # equivalent stress is calculated as the yield stress in the
@@ -448,20 +448,21 @@ class LoadResponseSet(object):
                    'an equivalent stress parameter, so `{}` is not required.')
             if uniaxial_response is not None:
                 raise ValueError(msg.format('uniaxial_response'))
-            if kwargs.get('equivalent_stress') is not None:
+            if fixed_params.get('equivalent_stress') is not None:
                 raise ValueError(msg.format('equivalent_stress'))
 
-        kwargs_copy = copy.deepcopy(kwargs)
+        fixed_params_copy = copy.deepcopy(fixed_params)
         if uniaxial_eq_stress:
-            kwargs_copy.update({
+            fixed_params_copy.update({
                 'equivalent_stress': uniaxial_eq_stress,
             })
 
-        return kwargs_copy
+        return fixed_params_copy
 
     @at_most_one_of('equivalent_stress', 'uniaxial_response')
     def fit_yield_function(self, yield_function, yield_point_criteria_idx=None,
-                           uniaxial_response=None, initial_params=None, **kwargs):
+                           uniaxial_response=None, initial_params=None, opt_params=None,
+                           **fixed_params):
         """Perform a fit to a yield function of all computed yield stresses.
 
         Parameters
@@ -477,7 +478,17 @@ class LoadResponseSet(object):
         initial_params : dict, optional
             Any initial guesses for the fitting parameters. Mutually exclusive with
             additional keyword arguments passed, which are considered to be fixed.
-        kwargs : dict
+        opt_params : dict, optional
+            Optimisation parameters. Dict with any of the keys:
+                default_bounds : list of length two, optional
+                    The bounds applied to all non-fixed yield function parameters by
+                    default.
+                bounds : dict, optional
+                    Dict of bounds for individual named parameters. These bounds take
+                    precedence over `default_bounds`.
+                **kwargs : dict
+                    Other parameters to be passed to the SciPy least_squares function.
+        **fixed_params : dict
             Any yield function parameters to be fixed during the fit can be passed as
             additional keyword arguments.
 
@@ -497,7 +508,7 @@ class LoadResponseSet(object):
         elif not issubclass(yield_function, YieldFunction):
             raise TypeError(msg)
 
-        bad_kwargs = list(set(kwargs.keys()) - set(yield_function.PARAMETERS))
+        bad_kwargs = list(set(fixed_params.keys()) - set(yield_function.PARAMETERS))
         if bad_kwargs:
             bad_kwargs_fmt = ', '.join([f'"{i}"' for i in bad_kwargs])
             raise ValueError(f'Unknown yield function parameters: {bad_kwargs_fmt}')
@@ -535,13 +546,14 @@ class LoadResponseSet(object):
                 ypc_idx,
                 ypc_val_idx,
                 uniaxial_response,
-                **kwargs
+                **fixed_params
             )
 
             # Perform fit:
             yld_func_obj = yield_function.from_fit(
                 yield_stress,
                 initial_params=initial_params,
+                opt_params=opt_params,
                 **updated_kwargs
             )
 
