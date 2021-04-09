@@ -6,6 +6,7 @@ inherit from this class.
 """
 
 import abc
+import copy
 import functools
 
 import numpy as np
@@ -187,7 +188,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
 
             bounds_all = (-np.inf, +np.inf)
             if opt_params:
-
+                opt_params = copy.deepcopy(opt_params)
                 def_bounds = opt_params.pop('default_bounds')
                 bounds_dict = opt_params.pop('bounds')
 
