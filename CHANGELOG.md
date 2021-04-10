@@ -1,10 +1,14 @@
 # Change Log
 
-## [0.1.14] - 2021.04.xx
+## [0.1.14] - 2021.04.10
 
 ### Added
 
-- Add ability to specify fitting bounds and other optimisation parameters to `YieldFunction.from_fit()`.
+- Add ability to specify fitting bounds and other optimisation parameters in `YieldFunction.from_fit` and `LoadResponseSet.fit_yield_function`.
+
+### Changed
+
+- `LoadResponseSet.yield_functions` attribute renamed `LoadResponseSet.fitted_yield_functions`.
 
 ## [0.1.13] - 2021.03.28
 
