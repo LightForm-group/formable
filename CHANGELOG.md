@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.15] - 2021.04.10
+
+### Fixed
+
+- Bug fix in `LoadResponseSet.to_dict` if an associated yield function was not fitted.
+
 ## [0.1.14] - 2021.04.10
 
 ### Added

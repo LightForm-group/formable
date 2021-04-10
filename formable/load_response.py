@@ -302,7 +302,8 @@ class LoadResponseSet(object):
                     'yield_function': {
                         'name': i['yield_function'].name,
                         **i['yield_function'].get_parameters(),
-                        'fit_info': dict(i['yield_function'].fit_info),
+                        'fit_info': (dict(i['yield_function'].fit_info)
+                                     if i['yield_function'].fit_info else None),
                     }
                 }
                 for i in self.fitted_yield_functions
