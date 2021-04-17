@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.15] - 2021.04.xx
+
+### Changed
+
+- 2D yield function plotting now use scikit-image to compute the zero-contour, which can then be plotted as scatter-plot data, instead of a Plotly contour plot. Partial fix (2D only) for [#9](https://github.com/LightForm-group/formable/issues/9). The old behaviour can be switched on with `use_plotly_contour=True` in methods: `YieldFunction.compare_2D`, `YieldFunction.show_2D` and `LoadResponseSet.show_yield_functions_2D`.
+
 ## [0.1.15] - 2021.04.10
 
 ### Fixed

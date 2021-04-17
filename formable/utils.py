@@ -152,3 +152,17 @@ def read_non_uniform_csv(path, delimiter=',', skip_rows=0, header_row=1):
 
 def nan_array_to_list(arr):
     return np.where(np.isnan(arr), None, arr).tolist()
+
+
+def remap_contours(grid_coords_2D, contours, resolution, normalise):
+    if not normalise:
+        grid_coords_2D = grid_coords_2D / 1e6
+    x = grid_coords_2D[0, :resolution + 1]
+    y = grid_coords_2D[1, 0::resolution + 1]
+    contours_new = []
+    for contour in contours:
+        contour_new = contour.copy()
+        contour_new[:, 0] = (contour[:, 0] * (x.max() - x.min()) / (x.size - 1)) + x.min()
+        contour_new[:, 1] = (contour[:, 1] * (y.max() - y.min()) / (y.size - 1)) + y.min()
+        contours_new.append(contour_new)
+    return contours_new

@@ -54,6 +54,7 @@ setup(
         'vecmaths',
         'notebook>=5.3',
         'ipywidgets>=7.5',
+        'scikit-image',
     ],
     project_urls={
         'Github': 'https://github.com/LightForm-group/formable',

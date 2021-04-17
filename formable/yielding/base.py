@@ -13,6 +13,7 @@ import numpy as np
 from plotly import graph_objects
 from plotly.colors import DEFAULT_PLOTLY_COLORS
 from scipy.optimize import least_squares, curve_fit, OptimizeResult
+from skimage.measure import find_contours
 
 from formable import utils, maths_utils
 from formable.yielding.map import get_yield_function_map
@@ -547,7 +548,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                    stress_states=None, up=None, show_contour_grid=False,
                    stress_indices=None, join_stress_states=False, legend_text=None,
                    show_numerical_lankford=False, show_numerical_lankford_fit=False,
-                   layout=None):
+                   layout=None, use_plotly_contour=False):
         """Visualise multiple yield functions in 2D.
 
         Parameters
@@ -555,6 +556,9 @@ class YieldFunction(metaclass=abc.ABCMeta):
         join_stress_states : bool, optional
             If True, stress states corresponding to the same `stress_indices` values will
             be joined by straight lines. False by default.
+        use_plotly_contour : bool, optional
+            If True, plot each yield function as a Plotly contour plot with a single
+            zero-contour. If False, calculate the zero-contour using scikit-image.
 
         """
 
@@ -710,31 +714,56 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     },
                 )
 
-            fig_data.append({
-                'type': 'contour',
-                'x': grid_coords_2D[0],
-                'y': grid_coords_2D[1],
-                'z': i,
-                'contours': {
-                    'start': 0,
-                    'end': 0,
-                    'size': 1,
-                    'coloring': 'none',
-                },
-                'line': {
-                    # Resolution must be high enough to accurately portray curvature;
-                    # so don't rely on smoothing!
-                    'smoothing': 0,
-                    'color': DEFAULT_PLOTLY_COLORS[
-                        idx % len(DEFAULT_PLOTLY_COLORS)
-                    ],
-                },
-                'showscale': False,
-                'showlegend': True,
-                'hoverinfo': 'none',
-                'name': name,
-                'legendgroup': name,
-            })
+            if use_plotly_contour:
+                fig_data.append({
+                    'type': 'contour',
+                    'x': grid_coords_2D[0],
+                    'y': grid_coords_2D[1],
+                    'z': i,
+                    'contours': {
+                        'start': 0,
+                        'end': 0,
+                        'size': 1,
+                        'coloring': 'none',
+                    },
+                    'line': {
+                        # Resolution must be high enough to accurately portray curvature;
+                        # so don't rely on smoothing!
+                        'smoothing': 0,
+                        'color': DEFAULT_PLOTLY_COLORS[
+                            idx % len(DEFAULT_PLOTLY_COLORS)
+                        ],
+                    },
+                    'showscale': False,
+                    'showlegend': True,
+                    'hoverinfo': 'none',
+                    'name': name,
+                    'legendgroup': name,
+                })
+            else:
+                yld_func_vals = i.reshape((resolution + 1, resolution + 1)).T
+                contours_scaled = find_contours(yld_func_vals, 0)
+                contours = utils.remap_contours(
+                    grid_coords_2D=grid_coords_2D,
+                    contours=contours_scaled,
+                    resolution=resolution,
+                    normalise=normalise,
+                )
+                fig_data.append({
+                    'type': 'scatter',
+                    'x': contours[0][:, 0],
+                    'y': contours[0][:, 1],
+                    'line': {
+                        'color': DEFAULT_PLOTLY_COLORS[
+                            idx % len(DEFAULT_PLOTLY_COLORS)
+                        ],
+                        'width': 0.5,
+                    },
+                    'showlegend': True,
+                    'hoverinfo': 'none',
+                    'name': name,
+                    'legendgroup': name,
+                })
 
         if stress_states is not None:
 
@@ -1294,7 +1323,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 stress_states=None, up=None, show_contour_grid=False, stress_indices=None,
                 join_stress_states=False, legend_text=None,
                 show_numerical_lankford=False, show_numerical_lankford_fit=False,
-                layout=None):
+                layout=None, use_plotly_contour=False):
         """
         Parameters
         ----------
@@ -1319,6 +1348,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
             show_numerical_lankford=show_numerical_lankford,
             show_numerical_lankford_fit=show_numerical_lankford_fit,
             layout=layout,
+            use_plotly_contour=use_plotly_contour,
         )
 
     def get_numerical_lankford(self, fit_domain=0.05, resolution=300, tol=1e-4):
