@@ -91,7 +91,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         return value
 
     @classmethod
-    def from_name(cls, name, fit_info=None, **parameters):
+    def from_name(cls, name, fit_info=None, yield_point=None, **parameters):
         'Get a specific yield function from the name and parameters.'
         YIELD_FUNCTION_MAP = get_yield_function_map()
         if name not in YIELD_FUNCTION_MAP:
@@ -106,6 +106,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         yld_func_class = YIELD_FUNCTION_MAP[name]
         yld_func = yld_func_class(**parameters)
         yld_func.fit_info = fit_info
+        yld_func.yield_point = yield_point
 
         return yld_func
 
