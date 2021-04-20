@@ -154,9 +154,7 @@ def nan_array_to_list(arr):
     return np.where(np.isnan(arr), None, arr).tolist()
 
 
-def remap_contours(grid_coords_2D, contours, resolution, normalise):
-    if not normalise:
-        grid_coords_2D = grid_coords_2D / 1e6
+def remap_contours(grid_coords_2D, contours, resolution):
     x = grid_coords_2D[0, :resolution + 1]
     y = grid_coords_2D[1, 0::resolution + 1]
     contours_new = []

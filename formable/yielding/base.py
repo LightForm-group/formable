@@ -748,7 +748,6 @@ class YieldFunction(metaclass=abc.ABCMeta):
                     grid_coords_2D=grid_coords_2D,
                     contours=contours_scaled,
                     resolution=resolution,
-                    normalise=normalise,
                 )
                 fig_data.append({
                     'type': 'scatter',
