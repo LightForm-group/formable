@@ -4,15 +4,16 @@ Yield function definitions (represented here as Python classes) from the literat
 
 Notes
 -----
-Each yield function class must define three methods:
+Each yield function class must define two methods:
     __init__
-        All yield function parameters are assigned
-    get_value
-        One argument `stress_states`. Yield functions are defined such that the return of
-        this method should be zero for a stress state that coincides with the surface
-        defined by the yield function.
+        All yield function parameters are assigned as attributes.
     residual
-        Static method used as fitting callable.
+        Static method used as fitting callable, and by the parent class method
+        `get_value`. This method must be decorated by `yield_function_fitter`, which
+        ensures that all parameters are contained with the `**kwargs` dict argument,
+        regardless of those that are passed in the `fitting_params` list argument. Within
+        this method, all parameters should be accessed from the `**kwargs` dict (not from
+        the `fitting_params` list).
 
 """
 
