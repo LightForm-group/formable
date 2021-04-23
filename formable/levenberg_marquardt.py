@@ -15,13 +15,18 @@ from formable.utils import find_nearest_index
 class FittingParameter(object):
     'Represents a parameter to be fit and its fitted values.'
 
-    def __init__(self, name, values, address, perturbation):
+    def __init__(self, name, values, address, perturbation, scale=None):
 
         self.name = name
         self.address = address
         self.perturbation = perturbation
 
         self.values = np.array(values)
+        self.scale = scale
+
+        if self.values.size == 1:
+            self.scale = values[0]
+            self.values[0] = 1
 
     def to_dict(self):
         'Represent as a JSON-compatible dict.'
@@ -30,6 +35,7 @@ class FittingParameter(object):
             'address': self.address,
             'perturbation': self.perturbation,
             'values': self.values.tolist(),
+            'scale': self.scale,
         }
         return out
 
@@ -54,7 +60,7 @@ class FittingParameter(object):
 
     @property
     def initial_value(self):
-        return self.values[0]
+        return self.values[0] * self.scale
 
     def get_perturbation(self, idx=-1):
         return self.values[idx] * self.perturbation
@@ -70,7 +76,7 @@ class FittingParameter(object):
             ')').format(
             self.__class__.__name__,
             self.name,
-            self.values,
+            self.values * self.scale,
         )
         return out
 
@@ -253,7 +259,7 @@ class LMFitterOptimisation(object):
     def fitting_params(self):
         out = {}
         for param in self.lm_fitter.fitting_params:
-            out.update({param.name: param.values[self.index]})
+            out.update({param.name: param.values[self.index] * param.scale})
         return out
 
     @property
@@ -467,7 +473,7 @@ class LMFitter(object):
                 new_params,
                 fit_param.address[-1],
                 fit_param.address[:-1],
-                float(fit_param.values[fitting_idx]),
+                float(fit_param.values[fitting_idx]) * fit_param.scale,
             )
         return new_params
 
