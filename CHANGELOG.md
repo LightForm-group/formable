@@ -4,7 +4,8 @@
 
 ### Added
 
-- Add animation widget for yield func evolution: `animate_yield_function_evolution(load_response_sets, ...)`
+- Add animation widget for yield func evolution: `animate_yield_function_evolution(load_response_sets, ...)`.
+- Ability to add sheet direction labels in yield function plots.
 
 ## [0.1.16] - 2021.04.23
 
