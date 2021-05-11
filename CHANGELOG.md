@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.17] - 2021.05.11
+
+### Added
+
+- Add animation widget for yield func evolution: `animate_yield_function_evolution(load_response_sets, ...)`
+
 ## [0.1.16] - 2021.04.23
 
 ### Changed

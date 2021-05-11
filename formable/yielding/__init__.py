@@ -5,6 +5,7 @@ from formable.yielding.base import (
     yield_function_fitter,
     DEF_2D_RES,
     DEF_3D_RES,
+    animate_yield_function_evolution,
 )
 from formable.yielding.yield_functions import *
 from formable.yielding.yield_point import YieldPointCriteria

@@ -1428,3 +1428,347 @@ class YieldFunction(metaclass=abc.ABCMeta):
         }
 
         return out
+
+
+class YieldFunctionEvolutionViz:
+    """Class to hold multiple LoadResponseSet objects and generate a widget
+    for examining the time-evolution of fitted yield functions."""
+
+    def __init__(self, load_response_sets, plane, yield_function_names=None,
+                 sheet_dirs=None, normalise=True, resolution=100, equivalent_stress=None,
+                 min_stress=None, max_stress=None, up=None):
+        """
+        Parameters
+        ----------
+        load_response_sets : list of LoadResponseSet
+            List of LoadResponseSet objects whose fitted yield functions are to be
+            included in the animation. Fitted yield functions from all objects will be
+            collected and animated according to their respective yield point criteria.
+        yield_function_names : list of str, optional
+            If specified, only these yield function names will be included as separate
+            traces.    
+
+        """
+
+        self.load_response_sets = load_response_sets
+        self.yield_function_names = yield_function_names
+        self.plane = plane
+        self.normalise = normalise
+        self.sheet_dirs = sheet_dirs
+
+        # keyed by yield function name:
+        fitted_yld_funcs_by_name = {}
+        yield_points_by_name = {}
+
+        self.YPC_name = None
+        for load_resp_set in self.load_response_sets:
+
+            for i in load_resp_set.fitted_yield_functions:
+
+                yld_point = load_resp_set.yield_point_criteria[
+                    i['YPC_idx']
+                ].values[0, i['YPC_value_idx']]
+
+                if self.YPC_name is None:
+                    self.YPC_name = load_resp_set.yield_point_criteria[i['YPC_idx']].source
+                elif load_resp_set.yield_point_criteria[i['YPC_idx']].source != self.YPC_name:
+                    msg = 'Different yield point criteria sources used.'
+                    raise NotImplementedError(msg)
+
+                yld_func_name = i['yield_function'].name
+
+                if yld_func_name not in fitted_yld_funcs_by_name:
+                    fitted_yld_funcs_by_name.update({yld_func_name: []})
+                if yld_func_name not in yield_points_by_name:
+                    yield_points_by_name.update({yld_func_name: []})
+
+                yld_point_str = f'{yld_point:.10f}'
+
+                if yld_point_str in yield_points_by_name:
+                    msg = (f'Yield point "{yld_point_str}" for yield function '
+                           f'"{yld_func_name}" appears more than once!')
+                    raise NotImplementedError(msg)
+                else:
+                    fitted_yld_funcs_by_name[yld_func_name].append(i['yield_function'])
+                    yield_points_by_name[yld_func_name].append(yld_point_str)
+
+        all_yield_points = [
+            f'{i:.10f}' for i in
+            sorted(set([
+                float(j)
+                for i in yield_points_by_name.values()
+                for j in i
+            ]))
+        ]
+
+        self.all_yield_points = all_yield_points
+        self.fitted_yld_funcs_by_name = fitted_yld_funcs_by_name
+        self.yield_points_by_name = yield_points_by_name
+        self.yield_func_order = list(self.fitted_yld_funcs_by_name.keys())
+        self.all_yield_functions = [
+            j
+            for i in self.yield_func_order
+            for j in self.fitted_yld_funcs_by_name[i]
+        ]
+
+        self.contours_by_name = self._get_contours(
+            resolution,
+            normalise,
+            equivalent_stress,
+            min_stress,
+            max_stress,
+            up,
+        )
+
+        self._widgets = self._generate_widgets()
+        self._visual = self._generate_visual()
+
+    @property
+    def num_yield_points(self):
+        return len(self.all_yield_points)
+
+    def _get_contours(self, resolution, normalise, equivalent_stress, min_stress,
+                      max_stress, up):
+
+        stress_range = YieldFunction._get_multi_plot_stress_range(
+            yield_functions=self.all_yield_functions,
+            normalise=normalise,
+            equivalent_stress=equivalent_stress,
+            min_stress=min_stress,
+            max_stress=max_stress,
+        )
+        min_stress = stress_range['min_stress']
+        max_stress = stress_range['max_stress']
+        eq_stress = stress_range['eq_stress']
+
+        grid_coords_2D, values_all, basis_unit = YieldFunction.get_2D_multi_plot_data(
+            self.plane,
+            self.all_yield_functions,
+            normalise=normalise,
+            resolution=resolution,
+            equivalent_stress=eq_stress,
+            min_stress=min_stress,
+            max_stress=max_stress,
+            up=up
+        )
+
+        self.basis_unit = basis_unit
+        if not normalise:
+            grid_coords_2D /= 1e6
+
+        contours_by_name = {}
+        for yld_func, i in zip(self.all_yield_functions, values_all):
+            yld_func_vals = i.reshape((resolution + 1, resolution + 1)).T
+            contours_scaled = find_contours(yld_func_vals, 0)
+            contours = utils.remap_contours(
+                grid_coords_2D=grid_coords_2D,
+                contours=contours_scaled,
+                resolution=resolution,
+            )
+
+            if yld_func.name not in contours_by_name:
+                contours_by_name.update({yld_func.name: []})
+            contours_by_name[yld_func.name].append(contours)
+
+        all_contour_coords = np.concatenate([
+            i[0] for v in contours_by_name.values() for i in v
+        ])
+        maxs = np.max(all_contour_coords, axis=0)
+        mins = np.min(all_contour_coords, axis=0)
+        max_pad = [i * 0.1 for i in maxs]
+        min_pad = [i * 0.1 for i in mins]
+        self.x_range = [mins[0] + min_pad[0], maxs[0] + max_pad[0]]
+        self.y_range = [mins[1] + min_pad[1], maxs[1] + max_pad[1]]
+
+        return contours_by_name
+
+    def _generate_widgets(self):
+        """Generate the widgets for the visualisation."""
+
+        contours_first = [
+            self.contours_by_name[name][
+                self.yield_points_by_name[name].index(self.all_yield_points[0])
+            ]
+            for name in self.yield_func_order
+        ]
+
+        fig_data = []
+        for idx, c in enumerate(contours_first):
+            name = f'{self.yield_func_order[idx]}'
+            fig_data.append({
+                'x': c[0][:, 0],
+                'y': c[0][:, 1],
+                'name': name,
+                'line': {
+                    'color': DEFAULT_PLOTLY_COLORS[
+                        idx % len(DEFAULT_PLOTLY_COLORS)
+                    ],
+                    'width': 0.5,
+                },
+                'showlegend': True,
+                'hoverinfo': 'none',
+            })
+        annot_font = {
+            'size': 14,
+        }
+
+        if self.normalise:
+            unit = ' / σ<sub>eq. max.</sub>'
+        else:
+            unit = ' / MPa'
+
+        basis_labels = [
+            f'σ<sub>11</sub>',
+            f'σ<sub>22</sub>',
+            f'σ<sub>33</sub>',
+        ]
+        basis_labels_unit = [f'{i}{unit}' for i in basis_labels]
+        axis_labels = {
+            'x': utils.format_axis_label(
+                self.basis_unit[:, 0],
+                basis_labels_unit,
+                sheet_dirs=self.sheet_dirs
+            ),
+            'y': utils.format_axis_label(
+                self.basis_unit[:, 1],
+                basis_labels_unit,
+                sheet_dirs=self.sheet_dirs
+            ),
+        }
+
+        fig_wig = graph_objects.FigureWidget(
+            data=fig_data,
+            layout={
+                'height': 600,
+                'width': 600,
+                'xaxis': {
+                    'scaleanchor': 'y',
+                    'range': self.x_range,
+                    'title': axis_labels['x'],
+                },
+                'yaxis': {
+                    'range': self.y_range,
+                    'title': axis_labels['y'],
+                },
+                'legend': {
+                    'yanchor': 'top',
+                    'xanchor': 'center',
+                    'y': -0.15,
+                    'x': 0.5,
+                    'tracegroupgap': 5,
+                },
+                'annotations': [
+                    {
+                        'text': f'{self.YPC_name} = {float(self.all_yield_points[0]):.6f}',
+                        'font': annot_font,
+                        'showarrow': False,
+                        'x': 0.04,
+                        'y': 0.98,
+                        'xanchor': 'left',
+                        'yanchor': 'top',
+                        'xref': 'paper',
+                        'yref': 'paper',
+                    }
+                ]
+            }
+        )
+
+        widget_dict = {
+            'figure': fig_wig,
+            'play': widgets.Play(
+                value=0,
+                min=0,
+                max=self.num_yield_points - 1,
+                step=1,
+                interval=50,
+                description="Press play",
+                disabled=False,
+            ),
+            'slider': widgets.IntSlider(
+                value=0,
+                min=0,
+                max=self.num_yield_points - 1,
+                step=1,
+                readout=False,
+            ),
+        }
+        widgets.jslink((widget_dict['play'], 'value'), (widget_dict['slider'], 'value'))
+        widget_dict['slider'].observe(self._update_figure, names='value')
+        return widget_dict
+
+    def _update_figure(self, change):
+
+        yld_point_idx = self._widgets['slider'].value
+        yld_point = self.all_yield_points[yld_point_idx]
+        fig = self._widgets['figure']
+        with fig.batch_update():
+            # loop over distinct yield functions and update their trace data to the
+            # specified yield point:
+            for trace_idx, name in enumerate(self.yield_func_order):
+
+                yld_func_idx = self.yield_points_by_name[name].index(yld_point)
+                try:
+                    contour = self.contours_by_name[name][yld_func_idx]
+                except KeyError:
+                    contour = None
+
+                if contour is not None:
+                    fig.data[trace_idx].x = contour[0][:, 0]
+                    fig.data[trace_idx].y = contour[0][:, 1]
+                else:
+                    fig.data[trace_idx].x = []
+                    fig.data[trace_idx].y = []
+
+                fig.layout.annotations[0].update({
+                    'text': f'{self.YPC_name} = {float(yld_point):.6f}',
+                })
+
+    def _generate_visual(self):
+        out = widgets.VBox(
+            children=[
+                self._widgets['figure'],
+                widgets.HBox(
+                    children=[self._widgets['play'], self._widgets['slider']]
+                ),
+            ]
+        )
+        return out
+
+    @property
+    def visual(self):
+        return self._visual
+
+
+def animate_yield_function_evolution(load_response_sets, plane, yield_function_names=None,
+                                     sheet_dirs=None, _return_obj=False, **kwargs):
+    """Generate a widget visualisation of the evolution of a set of yield functions,
+    for viewing within a Jupyter notebook environment.
+
+    Parameters
+    ----------
+    load_response_sets : list of LoadResponseSet
+        List of LoadResponseSet objects whose fitted yield functions are to be included in
+        the animation. Fitted yield functions from all objects will be collected and 
+        animated according to their respective yield point criteria.
+    yield_function_names : list of str, optional
+        If specified, only these yield function names will be included as separate traces.    
+
+    Returns
+    -------
+    ipwidgets.widgets.Box
+        A widget containing a Plotly FigureWidget and control widgets for evolving the 
+        yield point.
+
+    """
+
+    YFEV = YieldFunctionEvolutionViz(
+        load_response_sets,
+        plane,
+        yield_function_names,
+        sheet_dirs,
+        **kwargs
+    )
+    if _return_obj:
+        return YFEV
+    else:
+        return YFEV.visual
