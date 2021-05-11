@@ -41,7 +41,18 @@ def at_most_one_of(*conditioned_args):
     return requires_wrapped
 
 
-def format_axis_label(direction, basis_labels=['x', 'y', 'z'], zero_tol=1e-6):
+def format_axis_label(direction, basis_labels=['x', 'y', 'z'], zero_tol=1e-6,
+                      sheet_dirs=None):
+
+    add_sheet_dir = ' '
+    if sheet_dirs:
+        if np.allclose(np.abs(direction), [1, 0, 0]):
+            add_sheet_dir += '   ⟵ ' + sheet_dirs.get('x') + ' ⟶'
+        elif np.allclose(np.abs(direction), [0, 1, 0]):
+            add_sheet_dir += '   ⟵ ' + sheet_dirs.get('y') + ' ⟶'
+        elif np.allclose(np.abs(direction), [0, 0, 1]):
+            add_sheet_dir += '   ⟵ ' + sheet_dirs.get('z') + ' ⟶'
+
     out = []
     for i, lab in zip(direction, basis_labels):
         if abs(i) < zero_tol:
@@ -53,7 +64,7 @@ def format_axis_label(direction, basis_labels=['x', 'y', 'z'], zero_tol=1e-6):
             i_fmt = '-'
         else:
             i_fmt = '{:.4g}'.format(i)
-        out.append(i_fmt + lab)
+        out.append(i_fmt + lab + add_sheet_dir)
 
     out_fmt = ' + '.join(out)
 

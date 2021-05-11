@@ -14,6 +14,7 @@ from plotly import graph_objects
 from plotly.colors import DEFAULT_PLOTLY_COLORS
 from scipy.optimize import least_squares, curve_fit, OptimizeResult
 from skimage.measure import find_contours
+from ipywidgets import widgets
 
 from formable import utils, maths_utils
 from formable.yielding.map import get_yield_function_map
@@ -549,7 +550,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                    stress_states=None, up=None, show_contour_grid=False,
                    stress_indices=None, join_stress_states=False, legend_text=None,
                    show_numerical_lankford=False, show_numerical_lankford_fit=False,
-                   layout=None, use_plotly_contour=False):
+                   layout=None, use_plotly_contour=False, sheet_dirs=None):
         """Visualise multiple yield functions in 2D.
 
         Parameters
@@ -609,7 +610,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
         )
 
         if normalise:
-            unit = ' / σ<sub>0</sub>'
+            unit = ' / σ<sub>eq. max.</sub>'
         else:
             grid_coords_2D /= 1e6
             unit = ' / MPa'
@@ -904,14 +905,22 @@ class YieldFunction(metaclass=abc.ABCMeta):
             )
 
         basis_labels = [
-            f'σ<sub>1</sub>',
-            f'σ<sub>2</sub>',
-            f'σ<sub>3</sub>',
+            f'σ<sub>11</sub>',
+            f'σ<sub>22</sub>',
+            f'σ<sub>33</sub>',
         ]
         basis_labels_unit = [f'{i}{unit}' for i in basis_labels]
         axis_labels = {
-            'x': utils.format_axis_label(basis_unit[:, 0], basis_labels_unit),
-            'y': utils.format_axis_label(basis_unit[:, 1], basis_labels_unit),
+            'x': utils.format_axis_label(
+                basis_unit[:, 0],
+                basis_labels_unit,
+                sheet_dirs=sheet_dirs,
+            ),
+            'y': utils.format_axis_label(
+                basis_unit[:, 1],
+                basis_labels_unit,
+                sheet_dirs=sheet_dirs,
+            ),
         }
         fig_annots = []
         annot_font = {
@@ -936,7 +945,7 @@ class YieldFunction(metaclass=abc.ABCMeta):
                 fig_eq_stress_fmt = f'[{fig_eq_stress_fmt}]'
 
             eq_stress_annot = {
-                'text': f'Equivalent stress, σ<sub>0</sub> = {fig_eq_stress_fmt}',
+                'text': f'Equivalent stress, σ<sub>eq.</sub> = {fig_eq_stress_fmt}',
                 'font': annot_font,
                 'showarrow': False,
                 'x': 0.04,
