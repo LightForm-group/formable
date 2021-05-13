@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.18] - 2021.xx.xx
+
+### Changed
+
+- Functions `get_load_case_uniaxial`, `get_load_case_biaxial` and `get_load_case_plane_strain` have been refactored, documented and generalised where applicable.
+
 ## [0.1.17] - 2021.05.11
 
 ### Added

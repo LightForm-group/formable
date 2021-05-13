@@ -8,8 +8,72 @@ import numpy as np
 from vecmaths.rotation import get_random_rotation_matrix, axang2rotmat
 
 
+def check_load_case(load_case):
+    """Sanity checks on a load case. This should be a unit test..."""
+
+    if load_case['def_grad_aim'] is not None:
+        dg_arr = load_case['def_grad_aim']
+    elif load_case['def_grad_rate'] is not None:
+        dg_arr = load_case['def_grad_rate']
+
+    if not np.alltrue(np.logical_xor(dg_arr.mask, load_case['stress'].mask)):
+        raise RuntimeError(f'Stress and strain tensor masks should be element-wise '
+                           f'mutually exclusive, but they are not.')
+
+    return load_case
+
+
 def get_load_case_uniaxial(total_time, num_increments, direction, target_strain_rate=None,
                            target_strain=None, rotation=None, dump_frequency=1):
+    """Get a uniaxial load case.
+
+    Parameters
+    ----------
+    total_time : float or int
+    num_increments : int
+    direction : str
+        Either a single character, "x", "y" or "z", representing the loading direction.
+    target_strain_rate : float
+        Target strain rate to apply along the loading direction.
+    target_strain : float
+        Target strain to achieve along the loading direction.
+    rotation : dict, optional
+        Dict to specify a rotation of the loading direction. With keys:
+            axis : ndarray of shape (3) or list of length 3
+                Axis of rotation.
+            angle_deg : float
+                Angle of rotation about `axis` in degrees.
+    dump_frequency : int, optional
+        By default, 1, meaning results are written out every increment.
+
+    Returns
+    -------
+    dict
+        Dict representing the load case, with keys:
+            direction : str
+                Passed through from input argument.
+            rotation : dict
+                Passed through from input argument.            
+            total_time : float or int
+                Passed through from input argument.
+            num_increments : int
+                Passed through from input argument.
+            rotation_matrix : ndarray of shape (3, 3), optional
+                If `rotation` was specified, this will be the matrix representation of
+                `rotation`.
+            def_grad_rate : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient rate tensor. Not None if target_strain_rate is 
+                specified. Masked values correspond to unmasked values in `stress`.
+            def_grad_aim : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient aim tensor. Not None if target_strain is specified.
+                Masked values correspond to unmasked values in `stress`.
+            stress : numpy.ma.core.MaskedArray of shape (3, 3)
+                Stress tensor. Masked values correspond to unmasked values in
+                `def_grad_rate` or `def_grad_aim`.
+            dump_frequency : int, optional
+                Passed through from input argument.
+
+    """
 
     # Validation:
     msg = 'Specify either `target_strain_rate` or `target_strain`.'
@@ -19,112 +83,104 @@ def get_load_case_uniaxial(total_time, num_increments, direction, target_strain_
         raise ValueError(msg)
 
     if rotation:
-        rotation = axang2rotmat(
+        rot_mat = axang2rotmat(
             np.array(rotation['axis']),
             rotation['angle_deg'],
             degrees=True
         )
+    else:
+        rot_mat = None
 
-    dg_uniaxial_val = target_strain_rate or target_strain
+    if target_strain_rate is not None:
+        def_grad_val = target_strain_rate
+    else:
+        def_grad_val = target_strain
 
-    # TODO: refactor:
-    if direction == 'x':
-        dg_arr = np.ma.masked_array(
-            [
-                [dg_uniaxial_val, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0]
-            ],
-            mask=np.array([
-                [0, 0, 0],
-                [0, 1, 0],
-                [0, 0, 1],
-            ])
-        )
+    dir_idx = ['x', 'y', 'z']
+    try:
+        loading_dir_idx = dir_idx.index(direction)
+    except ValueError:
+        msg = (f'Loading direction "{direction}" not allowed. It should be one of "x", '
+               f'"y" or "z".')
+        raise ValueError(msg)
 
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [1, 1, 1],
-                [1, 0, 1],
-                [1, 1, 0],
-            ])
-        )
-    elif direction == 'y':
-        dg_arr = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, dg_uniaxial_val, 0],
-                [0, 0, 0]
-            ],
-            mask=np.array([
-                [1, 0, 0],
-                [0, 0, 0],
-                [0, 0, 1],
-            ])
-        )
+    dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.eye(3))
+    stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.logical_not(np.eye(3)))
 
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [0, 1, 1],
-                [1, 1, 1],
-                [1, 1, 0],
-            ])
-        )
-    elif direction == 'z':
-        dg_arr = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, dg_uniaxial_val]
-            ],
-            mask=np.array([
-                [1, 0, 0],
-                [0, 1, 0],
-                [0, 0, 0],
-            ])
-        )
+    dg_arr[loading_dir_idx, loading_dir_idx] = def_grad_val
+    dg_arr.mask[loading_dir_idx, loading_dir_idx] = False
+    stress_arr.mask[loading_dir_idx, loading_dir_idx] = True
 
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [0, 1, 1],
-                [1, 0, 1],
-                [1, 1, 1],
-            ])
-        )
-
-    def_grad_aim = dg_arr if target_strain else None
-    def_grad_rate = dg_arr if target_strain_rate else None
+    def_grad_aim = dg_arr if target_strain is not None else None
+    def_grad_rate = dg_arr if target_strain_rate is not None else None
 
     load_case = {
+        'direction': direction,
+        'rotation': rotation,
         'total_time': total_time,
         'num_increments': num_increments,
+        'rotation_matrix': rot_mat,
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
-        'stress': stress,
-        'rotation': rotation,
+        'stress': stress_arr,
         'dump_frequency': dump_frequency,
     }
 
-    return load_case
+    return check_load_case(load_case)
 
 
 def get_load_case_biaxial(total_time, num_increments, direction, target_strain_rate=None,
-                          target_strain=None, dump_frequency=1):
+                          target_strain=None, rotation=None, dump_frequency=1):
+    """Get a biaxial load case.
+
+    Parameters
+    ----------
+    total_time : float or int
+    num_increments : int
+    direction : str
+        String of two characters, ij, where {i,j} ∈ {"x","y","z"}, corresponding to the
+        two loading directions.
+    target_strain_rate : list of float of length two
+        Target strain rates to apply along the two loading direction.
+    target_strain : list of float of length two
+        Target strains to achieve along the two loading directions.
+    rotation : dict, optional
+        Dict to specify a rotation of the loading direction. With keys:
+            axis : ndarray of shape (3) or list of length 3
+                Axis of rotation.
+            angle_deg : float
+                Angle of rotation about `axis` in degrees.        
+    dump_frequency : int, optional
+        By default, 1, meaning results are written out every increment.
+
+    Returns
+    -------
+    dict
+        Dict representing the load case, with keys:
+            direction : str
+                Passed through from input argument.
+            rotation : dict
+                Passed through from input argument.            
+            total_time : float or int
+                Passed through from input argument.
+            num_increments : int
+                Passed through from input argument.
+            rotation_matrix : ndarray of shape (3, 3), optional
+                If `rotation` was specified, this will be the matrix representation of
+                `rotation`.
+            def_grad_rate : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient rate tensor. Not None if target_strain_rate is 
+                specified. Masked values correspond to unmasked values in `stress`.
+            def_grad_aim : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient aim tensor. Not None if target_strain is specified.
+                Masked values correspond to unmasked values in `stress`.
+            stress : numpy.ma.core.MaskedArray of shape (3, 3)
+                Stress tensor. Masked values correspond to unmasked values in
+                `def_grad_rate` or `def_grad_aim`.
+            dump_frequency : int, optional
+                Passed through from input argument.
+
+    """
 
     # Validation:
     msg = 'Specify either `target_strain_rate` or `target_strain`.'
@@ -133,106 +189,113 @@ def get_load_case_biaxial(total_time, num_increments, direction, target_strain_r
     if all([t is not None for t in [target_strain_rate, target_strain]]):
         raise ValueError(msg)
 
-    dg_biaxial_vals = target_strain_rate or target_strain
+    if rotation:
+        rot_mat = axang2rotmat(
+            np.array(rotation['axis']),
+            rotation['angle_deg'],
+            degrees=True
+        )
+    else:
+        rot_mat = None
 
-    # TODO: refactor:
-    if direction == 'xy':
-        dg_arr = np.ma.masked_array(
-            [
-                [dg_biaxial_vals[0], 0, 0],
-                [0, dg_biaxial_vals[1], 0],
-                [0, 0, 0]
-            ],
-            mask=np.array([
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 1],
-            ])
-        )
+    if target_strain_rate is not None:
+        def_grad_val = target_strain_rate
+    else:
+        def_grad_val = target_strain
 
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [1, 1, 1],
-                [1, 1, 1],
-                [1, 1, 0],
-            ])
-        )
-    elif direction == 'xz':
-        dg_arr = np.ma.masked_array(
-            [
-                [dg_biaxial_vals[0], 0, 0],
-                [0, 0, 0],
-                [0, 0, dg_biaxial_vals[1]]
-            ],
-            mask=np.array([
-                [0, 0, 0],
-                [0, 1, 0],
-                [0, 0, 0],
-            ])
-        )
+    dir_idx = ['x', 'y', 'z']
+    load_dir_idx = []
+    for load_dir in direction:
+        try:
+            loading_dir_idx = dir_idx.index(load_dir)
+            load_dir_idx.append(loading_dir_idx)
+        except ValueError:
+            msg = (f'Loading direction "{load_dir}" not allowed. Both loading directions '
+                   f'should be one of "x", "y" or "z".')
+            raise ValueError(msg)
 
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [1, 1, 1],
-                [1, 0, 1],
-                [1, 1, 1],
-            ])
-        )
-    elif direction == 'yz':
-        dg_arr = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, dg_biaxial_vals[0], 0],
-                [0, 0, dg_biaxial_vals[1]]
-            ],
-            mask=np.array([
-                [1, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ])
-        )
+    zero_stress_dir = list(set(dir_idx) - set(direction))[0]
+    zero_stress_dir_idx = dir_idx.index(zero_stress_dir)
 
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [0, 1, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-            ])
-        )
+    dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
+    stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.ones((3, 3)))
 
-    def_grad_aim = dg_arr if target_strain else None
-    def_grad_rate = dg_arr if target_strain_rate else None
+    dg_arr[load_dir_idx, load_dir_idx] = def_grad_val
+    dg_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = True
+    stress_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = False
+
+    def_grad_aim = dg_arr if target_strain is not None else None
+    def_grad_rate = dg_arr if target_strain_rate is not None else None
 
     load_case = {
+        'direction': direction,
+        'rotation': rotation,
         'total_time': total_time,
         'num_increments': num_increments,
+        'rotation_matrix': rot_mat,
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
-        'stress': stress,
+        'stress': stress_arr,
         'dump_frequency': dump_frequency,
     }
 
-    return load_case
+    return check_load_case(load_case)
 
 
 def get_load_case_plane_strain(total_time, num_increments, direction,
-                               target_strain_rate=None, target_strain=None,
+                               target_strain_rate=None, target_strain=None, rotation=None,
                                dump_frequency=1):
+    """Get a plane-strain load case.
+
+    Parameters
+    ----------
+    total_time : float or int
+    num_increments : int
+    direction : str
+        String of two characters, ij, where {i,j} ∈ {"x","y","z"}. The first character, i,
+        corresponds to the loading direction and the second, j, corresponds to the
+        zero-strain direction. Zero stress will be maintained on the remaining direction.
+    target_strain_rate : float
+        Target strain rate to apply along the loading direction.
+    target_strain : float
+        Target strain to achieve along the loading direction.
+    rotation : dict, optional
+        Dict to specify a rotation of the loading direction. With keys:
+            axis : ndarray of shape (3) or list of length 3
+                Axis of rotation.
+            angle_deg : float
+                Angle of rotation about `axis` in degrees.        
+    dump_frequency : int, optional
+        By default, 1, meaning results are written out every increment.
+
+    Returns
+    -------
+    dict
+        Dict representing the load case, with keys:
+            direction : str
+                Passed through from input argument.
+            rotation : dict
+                Passed through from input argument.            
+            total_time : float or int
+                Passed through from input argument.
+            num_increments : int
+                Passed through from input argument.
+            rotation_matrix : ndarray of shape (3, 3), optional
+                If `rotation` was specified, this will be the matrix representation of
+                `rotation`.
+            def_grad_rate : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient rate tensor. Not None if target_strain_rate is 
+                specified. Masked values correspond to unmasked values in `stress`.
+            def_grad_aim : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient aim tensor. Not None if target_strain is specified.
+                Masked values correspond to unmasked values in `stress`.
+            stress : numpy.ma.core.MaskedArray of shape (3, 3)
+                Stress tensor. Masked values correspond to unmasked values in
+                `def_grad_rate` or `def_grad_aim`.
+            dump_frequency : int, optional
+                Passed through from input argument.
+
+    """
 
     # Validation:
     msg = 'Specify either `target_strain_rate` or `target_strain`.'
@@ -241,77 +304,60 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
     if all([t is not None for t in [target_strain_rate, target_strain]]):
         raise ValueError(msg)
 
-    dg_ps_val = target_strain_rate or target_strain
-
-    # TODO: refactor:
-    if direction == 'xy':
-        dg_arr = np.ma.masked_array(
-            [
-                [dg_ps_val, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0]
-            ],
-            mask=np.array([
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 1],
-            ])
-        )
-
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [1, 1, 1],
-                [1, 1, 1],
-                [1, 1, 0],
-            ])
-        )
-    elif direction == 'zy':
-        dg_arr = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, dg_ps_val]
-            ],
-            mask=np.array([
-                [1, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ])
-        )
-
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [0, 1, 1],
-                [1, 1, 1],
-                [1, 1, 1],
-            ])
+    if rotation:
+        rot_mat = axang2rotmat(
+            np.array(rotation['axis']),
+            rotation['angle_deg'],
+            degrees=True
         )
     else:
-        raise NotImplementedError()
+        rot_mat = None
 
-    def_grad_aim = dg_arr if target_strain else None
-    def_grad_rate = dg_arr if target_strain_rate else None
+    if target_strain_rate is not None:
+        def_grad_val = target_strain_rate
+    else:
+        def_grad_val = target_strain
+
+    dir_idx = ['x', 'y', 'z']
+    loading_dir, zero_strain_dir = direction
+    try:
+        loading_dir_idx = dir_idx.index(loading_dir)
+    except ValueError:
+        msg = (f'Loading direction "{loading_dir}" not allowed. It should be one of "x", '
+               f'"y" or "z".')
+        raise ValueError(msg)
+
+    if zero_strain_dir not in dir_idx:
+        msg = (f'Zero-strain direction "{zero_strain_dir}" not allowed. It should be one '
+               f'of "x", "y" or "z".')
+        raise ValueError(msg)
+
+    zero_stress_dir = list(set(dir_idx) - {loading_dir, zero_strain_dir})[0]
+    zero_stress_dir_idx = dir_idx.index(zero_stress_dir)
+
+    dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
+    stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.ones((3, 3)))
+
+    dg_arr[loading_dir_idx, loading_dir_idx] = def_grad_val
+    dg_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = True
+    stress_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = False
+
+    def_grad_aim = dg_arr if target_strain is not None else None
+    def_grad_rate = dg_arr if target_strain_rate is not None else None
 
     load_case = {
+        'direction': direction,
+        'rotation': rotation,
         'total_time': total_time,
         'num_increments': num_increments,
+        'rotation_matrix': rot_mat,
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
-        'stress': stress,
+        'stress': stress_arr,
         'dump_frequency': dump_frequency,
     }
 
-    return load_case
+    return check_load_case(load_case)
 
 
 def get_load_case_random_2D(total_time, num_increments, normal_direction,
