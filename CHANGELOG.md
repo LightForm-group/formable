@@ -2,9 +2,13 @@
 
 ## [0.1.18] - 2021.xx.xx
 
+### Added
+
+- Add `get_load_case_planar_2D` load case function.
+
 ### Changed
 
-- Functions `get_load_case_uniaxial`, `get_load_case_biaxial` and `get_load_case_plane_strain` have been refactored, documented and generalised where applicable.
+- Functions `get_load_case_uniaxial`, `get_load_case_biaxial` and `get_load_case_plane_strain` have been refactored, documented and generalised where applicable. The returned `dict` from these functions now includes passing through `direction` and `rotation`. A new key `rotation_matrix` is the matrix representation of the rotation specified, if specified.
 
 ## [0.1.17] - 2021.05.11
 
