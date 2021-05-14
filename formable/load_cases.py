@@ -375,14 +375,16 @@ def get_load_case_planar_2D(total_time, num_increments, normal_direction,
         direction.
     target_strain_rate : (nested) list of float or ndarray of shape (2, 2)
         Target deformation gradient rate components. Either a 2D array, nested list, or a
-        flat list. The first and third elements correspond to the normal components of
-        the deformation gradient rate tensor. The second element corresponds to the
-        first-row, second-column (shear) component.
+        flat list. If passed as a flat list, the first and fourth elements correspond to
+        the normal components of the deformation gradient rate tensor. The second element
+        corresponds to the first-row, second-column (shear) component and the third
+        element corresponds to the second-row, first-column (shear) component.
     target_strain : (nested) list of float or ndarray of shape (2, 2)
         Target deformation gradient components. Either a 2D array, nested list, or a
-        flat list. The first and third elements correspond to the normal components of
-        the deformation gradient tensor. The second element corresponds to the first-row,
-        second-column (shear) component.
+        flat list. If passed as a flat list, the first and fourth elements correspond to
+        the normal components of the deformation gradient tensor. The second element
+        corresponds to the first-row, second-column (shear) component and the third
+        element corresponds to the second-row, first-column (shear) component.
     rotation : dict, optional
         Dict to specify a rotation of the loading direction. With keys:
             axis : ndarray of shape (3) or list of length 3
