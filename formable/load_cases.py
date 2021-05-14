@@ -447,10 +447,10 @@ def get_load_case_random_2D(total_time, num_increments, normal_direction,
                f'"x", "y" or "z".')
         raise ValueError(msg)
 
-    loading_col_idx = list({0, 1, 2} - set(normal_dir_idx))
+    loading_col_idx = list({0, 1, 2} - {normal_dir_idx})
 
     dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
-    stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.ones((3, 3)))
+    stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
 
     dg_row_idx = [
         loading_col_idx[0],
@@ -458,7 +458,12 @@ def get_load_case_random_2D(total_time, num_increments, normal_direction,
         loading_col_idx[0],
         loading_col_idx[1],
     ]
-    dg_col_idx = dg_row_idx
+    dg_col_idx = [
+        loading_col_idx[0],
+        loading_col_idx[0],
+        loading_col_idx[1],
+        loading_col_idx[1],
+    ]
     dg_arr[dg_row_idx, dg_col_idx] = def_grad_vals
     dg_arr.mask[:, normal_dir_idx] = True
     stress_arr.mask[:, loading_col_idx] = True
