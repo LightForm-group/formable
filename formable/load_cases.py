@@ -5,6 +5,7 @@ Functions that generate load cases for use in simulations.
 """
 
 import numpy as np
+from numpy.linalg.linalg import norm
 from vecmaths.rotation import get_random_rotation_matrix, axang2rotmat
 
 
@@ -360,6 +361,140 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
     return check_load_case(load_case)
 
 
+def get_load_case_planar_2D(total_time, num_increments, normal_direction,
+                            target_strain_rate=None, target_strain=None, rotation=None,
+                            dump_frequency=1):
+    """Get a random 2D planar load case.
+
+    Parameters
+    ----------
+    total_time : float or int
+    num_increments : int
+    normal_direction : str
+        A single character, "x", "y" or "z", representing the loading plane normal
+        direction.
+    target_strain_rate : (nested) list of float or ndarray of shape (2, 2)
+        Target deformation gradient rate components. Either a 2D array, nested list, or a
+        flat list. The first and third elements correspond to the normal components of
+        the deformation gradient rate tensor. The second element corresponds to the
+        first-row, second-column (shear) component.
+    target_strain : (nested) list of float or ndarray of shape (2, 2)
+        Target deformation gradient components. Either a 2D array, nested list, or a
+        flat list. The first and third elements correspond to the normal components of
+        the deformation gradient tensor. The second element corresponds to the first-row,
+        second-column (shear) component.
+    rotation : dict, optional
+        Dict to specify a rotation of the loading direction. With keys:
+            axis : ndarray of shape (3) or list of length 3
+                Axis of rotation.
+            angle_deg : float
+                Angle of rotation about `axis` in degrees.
+    dump_frequency : int, optional
+        By default, 1, meaning results are written out every increment.
+
+    Returns
+    -------
+    dict
+        Dict representing the load case, with keys:
+            normal_direction : str
+                Passed through from input argument.
+            rotation : dict
+                Passed through from input argument.            
+            total_time : float or int
+                Passed through from input argument.
+            num_increments : int
+                Passed through from input argument.
+            rotation_matrix : ndarray of shape (3, 3), optional
+                If `rotation` was specified, this will be the matrix representation of
+                `rotation`.
+            def_grad_rate : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient rate tensor. Not None if target_strain_rate is 
+                specified. Masked values correspond to unmasked values in `stress`.
+            def_grad_aim : numpy.ma.core.MaskedArray of shape (3, 3), optional
+                Deformation gradient aim tensor. Not None if target_strain is specified.
+                Masked values correspond to unmasked values in `stress`.
+            stress : numpy.ma.core.MaskedArray of shape (3, 3)
+                Stress tensor. Masked values correspond to unmasked values in
+                `def_grad_rate` or `def_grad_aim`.
+            dump_frequency : int, optional
+                Passed through from input argument.
+
+    """
+
+    # Validation:
+    msg = 'Specify either `target_strain_rate` or `target_strain`.'
+    if all([t is None for t in [target_strain_rate, target_strain]]):
+        raise ValueError(msg)
+    if all([t is not None for t in [target_strain_rate, target_strain]]):
+        raise ValueError(msg)
+
+    if rotation:
+        rot_mat = axang2rotmat(
+            np.array(rotation['axis']),
+            rotation['angle_deg'],
+            degrees=True
+        )
+    else:
+        rot_mat = None
+
+    if target_strain_rate is not None:
+        def_grad_vals = target_strain_rate
+    else:
+        def_grad_vals = target_strain
+
+    # Flatten list/array:
+    if isinstance(def_grad_vals, list):
+        if isinstance(def_grad_vals[0], list):
+            def_grad_vals = [j for i in def_grad_vals for j in i]
+    elif isinstance(def_grad_vals, np.ndarray):
+        def_grad_vals = def_grad_vals.flatten()
+
+    dir_idx = ['x', 'y', 'z']
+    try:
+        normal_dir_idx = dir_idx.index(normal_direction)
+    except ValueError:
+        msg = (f'Normal direction "{normal_direction}" not allowed. It should be one of '
+               f'"x", "y" or "z".')
+        raise ValueError(msg)
+
+    loading_col_idx = list({0, 1, 2} - {normal_dir_idx})
+    dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
+    stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
+
+    dg_row_idx = [
+        loading_col_idx[0],
+        loading_col_idx[0],
+        loading_col_idx[1],
+        loading_col_idx[1],
+    ]
+    dg_col_idx = [
+        loading_col_idx[0],
+        loading_col_idx[1],
+        loading_col_idx[0],
+        loading_col_idx[1],
+    ]
+    dg_arr[dg_row_idx, dg_col_idx] = def_grad_vals
+    dg_arr.mask[:, normal_dir_idx] = True
+    stress_arr.mask[:, loading_col_idx] = True
+
+    def_grad_aim = dg_arr if target_strain is not None else None
+    def_grad_rate = dg_arr if target_strain_rate is not None else None
+
+    load_case = {
+        'normal_direction': normal_direction,
+        'rotation': rotation,
+        'total_time': total_time,
+        'num_increments': num_increments,
+        'rotation_matrix': rot_mat,
+        'def_grad_rate': def_grad_rate,
+        'def_grad_aim': def_grad_aim,
+        'stress': stress_arr,
+        'dump_frequency': dump_frequency,
+    }
+
+    return check_load_case(load_case)
+
+
 def get_load_case_random_2D(total_time, num_increments, normal_direction,
                             target_strain_rate=None, target_strain=None, rotation=None,
                             dump_frequency=1):
@@ -416,74 +551,23 @@ def get_load_case_random_2D(total_time, num_increments, normal_direction,
 
     """
 
-    # Validation:
-    msg = 'Specify either `target_strain_rate` or `target_strain`.'
-    if all([t is None for t in [target_strain_rate, target_strain]]):
-        raise ValueError(msg)
-    if all([t is not None for t in [target_strain_rate, target_strain]]):
-        raise ValueError(msg)
-
-    if rotation:
-        rot_mat = axang2rotmat(
-            np.array(rotation['axis']),
-            rotation['angle_deg'],
-            degrees=True
-        )
-    else:
-        rot_mat = None
-
     def_grad_vals = (np.random.random(4) - 0.5) * 2
     if target_strain_rate is not None:
-        def_grad_vals *= target_strain_rate
+        target_strain_rate *= def_grad_vals
     else:
-        def_grad_vals *= target_strain
-        def_grad_vals += np.eye(2).reshape(-1)
+        target_strain *= def_grad_vals
+        target_strain += np.eye(2).reshape(-1)
 
-    dir_idx = ['x', 'y', 'z']
-    try:
-        normal_dir_idx = dir_idx.index(normal_direction)
-    except ValueError:
-        msg = (f'Normal direction "{normal_direction}" not allowed. It should be one of '
-               f'"x", "y" or "z".')
-        raise ValueError(msg)
-
-    loading_col_idx = list({0, 1, 2} - {normal_dir_idx})
-
-    dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
-    stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.zeros((3, 3)))
-
-    dg_row_idx = [
-        loading_col_idx[0],
-        loading_col_idx[1],
-        loading_col_idx[0],
-        loading_col_idx[1],
-    ]
-    dg_col_idx = [
-        loading_col_idx[0],
-        loading_col_idx[0],
-        loading_col_idx[1],
-        loading_col_idx[1],
-    ]
-    dg_arr[dg_row_idx, dg_col_idx] = def_grad_vals
-    dg_arr.mask[:, normal_dir_idx] = True
-    stress_arr.mask[:, loading_col_idx] = True
-
-    def_grad_aim = dg_arr if target_strain is not None else None
-    def_grad_rate = dg_arr if target_strain_rate is not None else None
-
-    load_case = {
-        'normal_direction': normal_direction,
-        'rotation': rotation,
-        'total_time': total_time,
-        'num_increments': num_increments,
-        'rotation_matrix': rot_mat,
-        'def_grad_rate': def_grad_rate,
-        'def_grad_aim': def_grad_aim,
-        'stress': stress_arr,
-        'dump_frequency': dump_frequency,
-    }
-
-    return check_load_case(load_case)
+    load_case = get_load_case_planar_2D(
+        total_time=total_time,
+        num_increments=num_increments,
+        normal_direction=normal_direction,
+        target_strain=target_strain,
+        target_strain_rate=target_strain_rate,
+        rotation=rotation,
+        dump_frequency=dump_frequency,
+    )
+    return load_case
 
 
 def get_load_case_random_3D(total_time, num_increments, target_strain, rotation=True,
