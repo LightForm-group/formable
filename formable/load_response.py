@@ -574,7 +574,8 @@ class LoadResponseSet(object):
                                 equivalent_stress=None, min_stress=None, max_stress=None,
                                 show_axes=True, planes=None, backend='plotly',
                                 show_stress_states=True, join_stress_states=False,
-                                show_contour_grid=False, layout=None,):
+                                show_contour_grid=False, layout=None,
+                                include_yield_functions=None):
         'Visualise all fitted yield functions and data in 3D.'
 
         if not self.fitted_yield_functions:
@@ -583,7 +584,11 @@ class LoadResponseSet(object):
         yld_funcs = []
         yld_stresses = []
         stress_indices = []
-        for yld_func_dict in self.fitted_yield_functions:
+        if not include_yield_functions:
+            include_yield_functions = range(len(self.fitted_yield_functions))
+        for yld_func_idx, yld_func_dict in enumerate(self.fitted_yield_functions):
+            if yld_func_idx not in include_yield_functions:
+                continue
             yld_funcs.append(yld_func_dict['yield_function'])
             yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]
             yld_stress_vals = yld_stress.values
@@ -619,7 +624,7 @@ class LoadResponseSet(object):
                                 show_stress_states=True, join_stress_states=False,
                                 show_numerical_lankford=False,
                                 show_numerical_lankford_fit=False, layout=None,
-                                use_plotly_contour=False):
+                                use_plotly_contour=False, include_yield_functions=None):
         'Visualise all fitted yield functions and data in 2D.'
 
         if not self.fitted_yield_functions:
@@ -628,7 +633,11 @@ class LoadResponseSet(object):
         yld_funcs = []
         yld_stresses = []
         stress_indices = []
-        for yld_func_dict in self.fitted_yield_functions:
+        if not include_yield_functions:
+            include_yield_functions = range(len(self.fitted_yield_functions))
+        for yld_func_idx, yld_func_dict in enumerate(self.fitted_yield_functions):
+            if yld_func_idx not in include_yield_functions:
+                continue
             yld_funcs.append(yld_func_dict['yield_function'])
             yld_stress = self.yield_stresses[yld_func_dict['yield_stress_idx']]
             yld_stress_vals = yld_stress.values

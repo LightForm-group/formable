@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.18] - 2021.xx.xx
+
+### Added 
+
+- Add option `include_yield_functions` to `LoadResponseSet.show_yield_functions_2D` and `LoadResponseSet.show_yield_functions_3D`, which is a list of fitted yield function indices to include in the visualisation.
+
 ## [0.1.17] - 2021.05.11
 
 ### Added
