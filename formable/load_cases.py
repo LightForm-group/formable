@@ -364,7 +364,7 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
 def get_load_case_planar_2D(total_time, num_increments, normal_direction,
                             target_strain_rate=None, target_strain=None, rotation=None,
                             dump_frequency=1):
-    """Get a random 2D planar load case.
+    """Get a planar 2D load case.
 
     Parameters
     ----------
