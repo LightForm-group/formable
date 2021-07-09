@@ -16,10 +16,13 @@ def check_load_case(load_case):
         dg_arr = load_case['def_grad_aim']
     elif load_case['def_grad_rate'] is not None:
         dg_arr = load_case['def_grad_rate']
+    elif load_case['vel_grad'] is not None:
+        dg_arr = load_case['vel_grad']
 
-    if not np.alltrue(np.logical_xor(dg_arr.mask, load_case['stress'].mask)):
-        raise RuntimeError(f'Stress and strain tensor masks should be element-wise '
-                           f'mutually exclusive, but they are not.')
+    if load_case['stress'] is not None:
+        if not np.alltrue(np.logical_xor(dg_arr.mask, load_case['stress'].mask)):
+            raise RuntimeError(f'Stress and strain tensor masks should be element-wise '
+                               f'mutually exclusive, but they are not.')
 
     return load_case
 
@@ -245,7 +248,7 @@ def get_load_case_biaxial(total_time, num_increments, direction, target_strain_r
 
 def get_load_case_plane_strain(total_time, num_increments, direction,
                                target_strain_rate=None, target_strain=None, rotation=None,
-                               dump_frequency=1):
+                               dump_frequency=1, strain_rate_mode=None):
     """Get a plane-strain load case.
 
     Parameters
@@ -255,7 +258,7 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
     direction : str
         String of two characters, ij, where {i,j} ∈ {"x","y","z"}. The first character, i,
         corresponds to the loading direction and the second, j, corresponds to the
-        zero-strain direction. Zero stress will be maintained on the remaining direction.
+        zero-strain direction. Zero stress will be specified on the remaining direction.
     target_strain_rate : float
         Target strain rate to apply along the loading direction.
     target_strain : float
@@ -268,6 +271,9 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
                 Angle of rotation about `axis` in degrees.        
     dump_frequency : int, optional
         By default, 1, meaning results are written out every increment.
+    strain_rate_mode : str, optional
+        One of "F_rate", "L", "L_approx". If not specified, default is "F_rate". Use
+        "L_approx" for specifying non-mixed boundary conditions.
 
     Returns
     -------
@@ -286,10 +292,14 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
                 `rotation`.
             def_grad_rate : numpy.ma.core.MaskedArray of shape (3, 3), optional
                 Deformation gradient rate tensor. Not None if target_strain_rate is 
-                specified. Masked values correspond to unmasked values in `stress`.
+                specified and `strain_rate_mode` is None or "F_rate". Masked values
+                correspond to unmasked values in `stress`.
             def_grad_aim : numpy.ma.core.MaskedArray of shape (3, 3), optional
                 Deformation gradient aim tensor. Not None if target_strain is specified.
                 Masked values correspond to unmasked values in `stress`.
+            vel_grad : (ndarray or numpy.ma.core.MaskedArray) of shape (3, 3), optional
+                Velocity gradient aim tensor. Not None if `strain_rate_mode` is one of "L"
+                (will be a masked array) or "L_approx" (will be an ordinary array).
             stress : numpy.ma.core.MaskedArray of shape (3, 3)
                 Stress tensor. Masked values correspond to unmasked values in
                 `def_grad_rate` or `def_grad_aim`.
@@ -303,6 +313,16 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
     if all([t is None for t in [target_strain_rate, target_strain]]):
         raise ValueError(msg)
     if all([t is not None for t in [target_strain_rate, target_strain]]):
+        raise ValueError(msg)
+
+    if strain_rate_mode is None:
+        strain_rate_mode = 'F_rate'
+    if strain_rate_mode not in ['F_rate', 'L', 'L_approx']:
+        msg = 'Strain rate mode must be `F_rate`, `L` or `L_approx`.'
+        raise ValueError(msg)
+    if strain_rate_mode in ['L', 'L_approx'] and target_strain_rate is None:
+        msg = (f'`target_strain_rate` must be specified for `strain_rate_mode`'
+               f'`{strain_rate_mode}`')
         raise ValueError(msg)
 
     if rotation:
@@ -340,11 +360,30 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
     stress_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.ones((3, 3)))
 
     dg_arr[loading_dir_idx, loading_dir_idx] = def_grad_val
-    dg_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = True
-    stress_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = False
 
-    def_grad_aim = dg_arr if target_strain is not None else None
-    def_grad_rate = dg_arr if target_strain_rate is not None else None
+    if strain_rate_mode == 'L':
+        # When using L with mixed BCs, each row must be either L or P:
+        dg_arr.mask[zero_stress_dir_idx] = True
+        stress_arr.mask[zero_stress_dir_idx] = False
+
+    elif strain_rate_mode == 'L_approx':
+        dg_arr = dg_arr.data  # No need for a masked array
+        # Without mixed BCs, we can get volume conservation with Trace(L) = 0:
+        dg_arr[zero_stress_dir_idx, zero_stress_dir_idx] = -def_grad_val
+        stress_arr = None
+
+    elif strain_rate_mode == 'F_rate':
+        dg_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = True
+        stress_arr.mask[zero_stress_dir_idx, zero_stress_dir_idx] = False
+
+    if strain_rate_mode in ['L', 'L_approx']:
+        def_grad_aim = None
+        def_grad_rate = None
+        vel_grad = dg_arr
+    else:
+        def_grad_aim = dg_arr if target_strain is not None else None
+        def_grad_rate = dg_arr if target_strain_rate is not None else None
+        vel_grad = None
 
     load_case = {
         'direction': direction,
@@ -354,6 +393,7 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
         'rotation_matrix': rot_mat,
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
+        'vel_grad': vel_grad,
         'stress': stress_arr,
         'dump_frequency': dump_frequency,
     }
