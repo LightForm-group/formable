@@ -7,8 +7,6 @@ Functions that generate load cases for use in simulations.
 import numpy as np
 from vecmaths.rotation import get_random_rotation_matrix, axang2rotmat
 
-from formable.utils import tensor33_rotate
-
 
 def get_load_case_uniaxial(total_time, num_increments, direction, target_strain_rate=None,
                            target_strain=None, rotation=None, dump_frequency=1):
@@ -234,7 +232,7 @@ def get_load_case_biaxial(total_time, num_increments, direction, target_strain_r
 
 def get_load_case_plane_strain(total_time, num_increments, direction,
                                target_strain_rate=None, target_strain=None,
-                               dump_frequency=1, strain_rate_mode=None):
+                               dump_frequency=1):
 
     # Validation:
     msg = 'Specify either `target_strain_rate` or `target_strain`.'
@@ -242,55 +240,11 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
         raise ValueError(msg)
     if all([t is not None for t in [target_strain_rate, target_strain]]):
         raise ValueError(msg)
-    if strain_rate_mode is None:
-        strain_rate_mode = 'F_rate'
-    if strain_rate_mode not in ['F_rate', 'L', 'L_approx']:
-        msg = 'Strain rate mode must be `F_rate`, `L` or `L_approx`.'
-        raise ValueError(msg)
-    if strain_rate_mode in ['L', 'L_approx'] and target_strain_rate is None:
-        msg = (f'`target_strain_rate` must be specified for `strain_rate_mode`'
-               f'`{strain_rate_mode}`')
-        raise ValueError(msg)
 
     dg_ps_val = target_strain_rate or target_strain
 
-    if strain_rate_mode == 'L':
-        dg_arr = np.ma.masked_array(
-            [
-                [dg_ps_val, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0]
-            ],
-            mask=np.array([
-                [0, 0, 0],
-                [0, 0, 0],
-                [1, 1, 1],
-            ])
-        )
-        stress = np.ma.masked_array(
-            [
-                [0, 0, 0],
-                [0, 0, 0],
-                [0, 0, 0],
-            ],
-            mask=np.array([
-                [1, 1, 1],
-                [1, 1, 1],
-                [0, 0, 0],
-            ])
-        )
-
-    elif strain_rate_mode == 'L_approx':
-        dg_arr = np.array(
-            [
-                [dg_ps_val, 0, 0],
-                [0, 0, 0],
-                [0, 0, -dg_ps_val]
-            ],
-        )
-        stress = None
-
-    else:
+    # TODO: refactor:
+    if direction == 'xy':
         dg_arr = np.ma.masked_array(
             [
                 [dg_ps_val, 0, 0],
@@ -303,6 +257,7 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
                 [0, 0, 1],
             ])
         )
+
         stress = np.ma.masked_array(
             [
                 [0, 0, 0],
@@ -315,40 +270,43 @@ def get_load_case_plane_strain(total_time, num_increments, direction,
                 [1, 1, 0],
             ])
         )
-
-    # Loadcase is produced for `xy` and rotated to any other sense.
-    if direction == 'xy':
-        pass
-
     elif direction == 'zy':
-        rot_mat = np.array([
-            [0, 0, 1],
-            [0, 1, 0],
-            [-1, 0, 0],
-        ])
+        dg_arr = np.ma.masked_array(
+            [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, dg_ps_val]
+            ],
+            mask=np.array([
+                [1, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+            ])
+        )
 
-        dg_arr = tensor33_rotate(dg_arr, rot_mat)
-        if stress is not None:
-            stress = tensor33_rotate(stress, rot_mat)
-
+        stress = np.ma.masked_array(
+            [
+                [0, 0, 0],
+                [0, 0, 0],
+                [0, 0, 0],
+            ],
+            mask=np.array([
+                [0, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1],
+            ])
+        )
     else:
         raise NotImplementedError()
 
-    if strain_rate_mode in ['L', 'L_approx']:
-        def_grad_aim = None
-        def_grad_rate = None
-        vel_grad = dg_arr
-    else:
-        def_grad_aim = dg_arr if target_strain else None
-        def_grad_rate = dg_arr if target_strain_rate else None
-        vel_grad = None
+    def_grad_aim = dg_arr if target_strain else None
+    def_grad_rate = dg_arr if target_strain_rate else None
 
     load_case = {
         'total_time': total_time,
         'num_increments': num_increments,
         'def_grad_rate': def_grad_rate,
         'def_grad_aim': def_grad_aim,
-        'vel_grad': vel_grad,
         'stress': stress,
         'dump_frequency': dump_frequency,
     }

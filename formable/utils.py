@@ -175,33 +175,3 @@ def remap_contours(grid_coords_2D, contours, resolution):
         contour_new[:, 1] = (contour[:, 1] * (y.max() - y.min()) / (y.size - 1)) + y.min()
         contours_new.append(contour_new)
     return contours_new
-
-
-def tensor33_rotate(tensor, rot_mat):
-    """Rotate a 3x3 tensor
-
-    Parameters
-    ----------
-    tensor : ndarray or masked array of shape (3,3)
-    rot_mat : ndarray of shape (3,3)
-
-    Returns
-    -------
-    ndarray or masked array of shape (3,3)
-        `tensor` rotated into a coordinate system defined by `rot_mat`.
-
-    """
-    if isinstance(tensor, np.ma.core.MaskedArray):
-        tensor_rot = np.ma.masked_array(
-            np.matmul(np.matmul(rot_mat, tensor.data), rot_mat.T),
-            mask=np.matmul(np.matmul(rot_mat, tensor.mask), rot_mat.T)
-        )
-
-    elif isinstance(tensor, np.ndarray):
-        tensor_rot = np.matmul(np.matmul(rot_mat, tensor), rot_mat.T)
-
-    else:
-        msg = 'Unknown type for tensor rotation.'
-        raise TypeError(msg)
-
-    return tensor_rot

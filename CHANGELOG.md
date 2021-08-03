@@ -5,7 +5,6 @@
 ### Added 
 
 - Add option `include_yield_functions` to `LoadResponseSet.show_yield_functions_2D` and `LoadResponseSet.show_yield_functions_3D`, which is a list of fitted yield function indices to include in the visualisation.
-- Add option `strain_rate_mode` to `get_load_case_plane_strain`, which sets if the load case is defined by deformation gradient, velocity gradient or an approximation excluding the stress condition.
 
 ## [0.1.17] - 2021.05.11
 
