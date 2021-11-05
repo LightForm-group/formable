@@ -669,3 +669,57 @@ def get_load_case_random_3D(total_time, num_increments, target_strain, rotation=
     }
 
     return load_case
+
+
+def get_load_case_uniaxial_cyclic(max_stress, min_stress, cycle_frequency,
+                                  num_increments_per_cycle, num_cycles, direction):
+
+    dir_idx = ['x', 'y', 'z']
+    try:
+        loading_dir_idx = dir_idx.index(direction)
+    except ValueError:
+        msg = (f'Loading direction "{direction}" not allowed. It should be one of "x", '
+               f'"y" or "z".')
+        raise ValueError(msg)
+
+    cycle_time = 1 / cycle_frequency
+
+    time_A = cycle_time / 4
+    incs_A = num_increments_per_cycle / 4
+    stress_rate_A = 2 * (max_stress - min_stress) * cycle_frequency
+    stress_rate_arr_A = np.ma.masked_array(
+        np.zeros((3, 3)), mask=np.logical_not(np.eye(3)))
+    stress_rate_arr_A[loading_dir_idx, loading_dir_idx] = stress_rate_A
+
+    time_B = cycle_time / 2
+    incs_B = num_increments_per_cycle / 2
+    stress_rate_B = 2 * (min_stress - max_stress) * cycle_frequency
+    stress_rate_arr_B = np.ma.masked_array(
+        np.zeros((3, 3)), mask=np.logical_not(np.eye(3)))
+    stress_rate_arr_B[loading_dir_idx, loading_dir_idx] = stress_rate_B
+
+    dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.eye(3))
+
+    # one cycle (0 to max, max to min, min to 0):
+    out = [
+        {
+            'stress_rate': stress_rate_arr_A,
+            'num_increments': incs_A,
+            'total_time': time_A,
+            'def_grad_aim': dg_arr,
+        },
+        {
+            'stress_rate': stress_rate_arr_B,
+            'num_increments': incs_B,
+            'total_time': time_B,
+            'def_grad_aim': dg_arr,
+        },
+        {
+            'stress_rate': stress_rate_arr_A,
+            'num_increments': incs_A,
+            'total_time': time_A,
+            'def_grad_aim': dg_arr,
+        },
+    ] * num_cycles
+
+    return out
