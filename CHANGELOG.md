@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.19] - 2021.xx.xx
+
+### Added
+
+- Add `cyclic_uniaxial` load case method to task `generate_load_case`
+
 ## [0.1.18] - 2021.08.06
 
 ### Added
