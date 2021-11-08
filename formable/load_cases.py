@@ -4,6 +4,8 @@ Functions that generate load cases for use in simulations.
 
 """
 
+import copy
+
 import numpy as np
 from numpy.linalg.linalg import norm
 from vecmaths.rotation import get_random_rotation_matrix, axang2rotmat
@@ -673,7 +675,7 @@ def get_load_case_random_3D(total_time, num_increments, target_strain, rotation=
 
 def get_load_case_uniaxial_cyclic(max_stress, min_stress, cycle_frequency,
                                   num_increments_per_cycle, num_cycles, direction,
-                                  waveform):
+                                  waveform, dump_frequency=1):
 
     dir_idx = ['x', 'y', 'z']
     try:
@@ -691,73 +693,40 @@ def get_load_case_uniaxial_cyclic(max_stress, min_stress, cycle_frequency,
         sig_diff = max_stress - min_stress
 
         A = 2 * np.pi / cycle_time
-        time = np.linspace(0, 2 * np.pi, num=num_increments_per_cycle, endpoint=False) / A
+        time = np.linspace(0, 2 * np.pi, num=num_increments_per_cycle, endpoint=True) / A
         sig = (sig_diff / 2) * np.sin(A * time) + sig_mean
-        sig_rate = (sig_diff / 2) * A * np.cos(A * time)
 
         time_per_inc = cycle_time / num_increments_per_cycle
 
-        stress_mask = np.ones((sig_rate.size, 3, 3))
+        stress_mask = np.ones((sig.size, 3, 3))
         stress_mask[:, [0, 1, 2], [0, 1, 2]] = 0
-        stress_rate_arr = np.ma.masked_array(
-            data=np.zeros((sig_rate.size, 3, 3)),
+        stress_arr = np.ma.masked_array(
+            data=np.zeros((sig.size, 3, 3)),
             mask=stress_mask,
         )
-        stress_rate_arr[:, loading_dir_idx, loading_dir_idx] = sig_rate
+        stress_arr[:, loading_dir_idx, loading_dir_idx] = sig
         
         dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.eye(3))
         
-        out = []
+        cycle = []
         for time_idx, time_i in enumerate(time):
-            out.append({
+            cycle.append({
                 'num_increments': 1,
                 'total_time': time_per_inc,
-                'stress_rate': stress_rate_arr[time_idx],
+                'stress': stress_arr[time_idx],
                 'def_grad_aim': dg_arr,
+                'dump_frequency': dump_frequency,
             })
             
-    elif waveform.lower() == 'triangle':
+        out = []
+        for cycle_idx in range(num_cycles):
+            cycle_i = copy.deepcopy(cycle)
+            if cycle_idx != num_cycles - 1:
+                 # intermediate cycle; remove repeated increment:
+                 cycle_i = cycle_i[:-1]
+            out.extend(cycle_i)
 
-        num_increments_per_cycle += (num_increments_per_cycle % 4)
-
-        time_A = cycle_time / 4
-        incs_A = int(num_increments_per_cycle / 4)
-        stress_rate_A = 2 * (max_stress - min_stress) * cycle_frequency
-        stress_rate_arr_A = np.ma.masked_array(
-            np.zeros((3, 3)), mask=np.logical_not(np.eye(3)))
-        stress_rate_arr_A[loading_dir_idx, loading_dir_idx] = stress_rate_A
-
-        time_B = cycle_time / 2
-        incs_B = int(num_increments_per_cycle / 2)
-        stress_rate_B = 2 * (min_stress - max_stress) * cycle_frequency
-        stress_rate_arr_B = np.ma.masked_array(
-            np.zeros((3, 3)), mask=np.logical_not(np.eye(3)))
-        stress_rate_arr_B[loading_dir_idx, loading_dir_idx] = stress_rate_B
-
-        dg_arr = np.ma.masked_array(np.zeros((3, 3)), mask=np.eye(3))
-
-        # one cycle (0 to max, max to min, min to 0):
-        out = [
-            {
-                'stress_rate': stress_rate_arr_A,
-                'num_increments': incs_A,
-                'total_time': time_A,
-                'def_grad_aim': dg_arr,
-            },
-            {
-                'stress_rate': stress_rate_arr_B,
-                'num_increments': incs_B,
-                'total_time': time_B,
-                'def_grad_aim': dg_arr,
-            },
-            {
-                'stress_rate': stress_rate_arr_A,
-                'num_increments': incs_A,
-                'total_time': time_A,
-                'def_grad_aim': dg_arr,
-            },
-        ]
-
-    out = out * num_cycles
+    else:
+        raise NotImplementedError('Only waveform "sine" is currently allowed.')
     
     return out
