@@ -291,7 +291,14 @@ class LMFitterOptimisation(object):
         self._error = errors[best_idx]
 
         cur_params = [i.values[-1] for i in self.lm_fitter.fitting_params]
-        new_params = [i + j for i, j in zip(cur_params, best_delta)]
+        
+        delta_ratio = [j/i for i, j in zip(cur_params, best_delta)]
+        max_delta_ratio = max(delta_ratio)
+
+        if max_delta_ratio > 0.5:
+            delta_ratio = [i/max_delta_ratio*0.5 for i in delta_ratio]
+        
+        new_params = [i*(1+j) for i, j in zip(cur_params, delta_ratio)] 
 
         return new_params
 
