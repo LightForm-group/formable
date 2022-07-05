@@ -217,11 +217,11 @@ class LoadResponse(object):
         yld_stress, good_idx = self.get_yield_stress(yield_point_criteria, value_idx)
 
         if yld_stress.shape:
-            yld_stress_principle = get_principal_values(yld_stress)
+            yld_stress_principal = get_principal_values(yld_stress)
         else:
-            yld_stress_principle = yld_stress
+            yld_stress_principal = yld_stress
 
-        return yld_stress_principle, good_idx
+        return yld_stress_principal, good_idx
 
     @requires('stress')
     def is_uniaxial(self, increment=-1, tol=0.3):
