@@ -32,7 +32,7 @@ class LoadResponse(object):
     load to a (model) material."""
 
     ALLOWED_DATA = [
-        'true_stress',
+        'stress',
         'equivalent_strain',
         'equivalent_plastic_strain',
         'accumulated_shear_strain',
@@ -80,7 +80,7 @@ class LoadResponse(object):
 
         self._num_increments = outer_shape
 
-        self._true_stress = incremental_data.pop('true_stress', None)
+        self._stress = incremental_data.pop('stress', None)
         self._equivalent_strain = incremental_data.pop('equivalent_strain', None)
         self._equivalent_plastic_strain = incremental_data.pop(
             'equivalent_plastic_strain', None)
@@ -145,8 +145,8 @@ class LoadResponse(object):
         return ', '.join(['"{}"'.format(i) for i in self.ALLOWED_DATA])
 
     @property
-    def true_stress(self):
-        return self._true_stress
+    def stress(self):
+        return self._stress
 
     @property
     def equivalent_strain(self):
@@ -161,12 +161,12 @@ class LoadResponse(object):
         return self._accumulated_shear_strain
 
     @property
-    @requires('true_stress')
-    def principal_true_stress(self):
-        """Get principal true stress values."""
-        return get_principal_values(self.true_stress)
+    @requires('stress')
+    def principal_stress(self):
+        """Get principal stress values."""
+        return get_principal_values(self.stress)
 
-    @requires('true_stress')
+    @requires('stress')
     @init_yield_point_criteria
     def get_yield_stress(self, yield_point_criteria, value_idx=None):
         """Find the yield stresses associated with a yield point criteria.
@@ -190,7 +190,7 @@ class LoadResponse(object):
 
         source_dat = getattr(self, yield_point_criteria.source)
         yield_stress, good_idx = yield_point_criteria.get_yield_stress(
-            source_dat, self.true_stress, value_idx=value_idx)
+            source_dat, self.stress, value_idx=value_idx)
 
         return yield_stress, good_idx
 
@@ -223,11 +223,11 @@ class LoadResponse(object):
 
         return yld_stress_principle, good_idx
 
-    @requires('true_stress')
+    @requires('stress')
     def is_uniaxial(self, increment=-1, tol=0.3):
         """Is the specified increment's true stress state approximately uniaxial?"""
 
-        princ_stress = self.principal_true_stress[increment]
+        princ_stress = self.principal_stress[increment]
 
         # Principal values are ordered largest to smallest, so check the first is larger
         # than the other two:
