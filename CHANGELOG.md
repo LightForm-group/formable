@@ -1,5 +1,12 @@
 # Change Log
 
+## [0.1.20] - 2022.08.08
+
+### Changed
+
+- Constrain LM fitting process
+- Relabel attribute `true_stress` to `stress` in `LoadResponse` class
+
 ## [0.1.19] - 2021.11.09
 
 ### Added
