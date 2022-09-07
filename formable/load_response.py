@@ -63,7 +63,13 @@ class LoadResponse(object):
             msg = ('Pass at least one incremental data array. Allowed data is {}.')
             raise ValueError(msg.format(self.allowed_data_fmt))
 
-        outer_shape = incremental_data[list(incremental_data.keys())[0]].shape[0]
+        inc_data_valid_key = ''
+        for k, v in incremental_data.items():
+            if v is not None:
+                inc_data_valid_key = k
+                break
+                
+        outer_shape = incremental_data[inc_data_valid_key].shape[0]
         err = False
         for i in incremental_data.values():
             if i is None:
