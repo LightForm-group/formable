@@ -86,7 +86,7 @@ class TensileTest(object):
     def _prepare_array(self, arr):
         'Cast a list (with potentially `None` values) into a float array.'
         if arr is not None:
-            arr = np.array(arr, dtype=np.float)
+            arr = np.array(arr, dtype=float)
         return arr
 
     def to_dict(self):
