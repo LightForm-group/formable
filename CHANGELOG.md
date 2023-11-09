@@ -1,5 +1,11 @@
 # Change Log
 
+## [0.1.21] - 2023.11.09
+
+### Fixed
+
+- Resolve numpy deprecation.
+
 ## [0.1.20] - 2022.08.08
 
 ### Changed
