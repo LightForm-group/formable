@@ -55,6 +55,7 @@ setup(
         'notebook>=5.3',
         'ipywidgets>=7.5',
         'scikit-image',
+        'anywidget',
     ],
     project_urls={
         'Github': 'https://github.com/LightForm-group/formable',
