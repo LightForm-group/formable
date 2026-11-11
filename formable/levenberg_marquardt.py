@@ -13,20 +13,43 @@ from formable.utils import find_nearest_index
 
 
 class FittingParameter(object):
-    'Represents a parameter to be fit and its fitted values.'
+    'Represents a parameter to be fit, its bounds, and its fitted values.'
 
-    def __init__(self, name, values, address, perturbation, scale=None):
+    def __init__(self, name, values, address, perturbation, scale=None, bounds=None):
+        """Create a parameter.
+
+        `bounds`, when supplied, are inclusive limits in the parameter's physical
+        units. Use `None` for an unbounded end, e.g. `(0, None)` for a positive value.
+        """
 
         self.name = name
         self.address = address
         self.perturbation = perturbation
 
-        self.values = np.array(values)
+        self.values = np.array(values, dtype=float)
         self.scale = scale
+        self.bounds = None if bounds is None else tuple(bounds)
 
-        if self.values.size == 1:
+        if self.bounds is not None:
+            if len(self.bounds) != 2:
+                raise ValueError('bounds must contain a lower and upper limit.')
+            lower, upper = self.bounds
+            if lower is not None and upper is not None and lower >= upper:
+                raise ValueError('The lower bound must be less than the upper bound.')
+
+        if self.values.size == 1 and self.scale is None:
             self.scale = values[0]
             self.values[0] = 1
+
+        if self.bounds is not None:
+            initial_value = self.values[0] * self.scale
+            lower, upper = self.bounds
+            if lower is not None and initial_value < lower:
+                raise ValueError('Initial value for {!r} is below its lower bound.'
+                                 .format(self.name))
+            if upper is not None and initial_value > upper:
+                raise ValueError('Initial value for {!r} is above its upper bound.'
+                                 .format(self.name))
 
     def to_dict(self):
         'Represent as a JSON-compatible dict.'
@@ -36,6 +59,7 @@ class FittingParameter(object):
             'perturbation': self.perturbation,
             'values': self.values.tolist(),
             'scale': self.scale,
+            'bounds': self.bounds,
         }
         return out
 
@@ -63,10 +87,32 @@ class FittingParameter(object):
         return self.values[0] * self.scale
 
     def get_perturbation(self, idx=-1):
-        return self.values[idx] * self.perturbation
+        requested = self.values[idx] * self.perturbation
+        if self.bounds is None:
+            return requested
+
+        perturbed_value = self._constrain(self.values[idx] + requested)
+        actual = perturbed_value - self.values[idx]
+        if actual == 0:
+            perturbed_value = self._constrain(self.values[idx] - requested)
+            actual = perturbed_value - self.values[idx]
+        if actual == 0:
+            raise ValueError('Cannot perturb {!r} within its bounds.'
+                             .format(self.name))
+        return actual
 
     def get_perturbed_value(self, idx=-1):
         return self.values[idx] + self.get_perturbation(idx)
+
+    def _constrain(self, value):
+        'Constrain a normalized value using physical-value bounds.'
+        physical_value = value * self.scale
+        lower, upper = self.bounds
+        if lower is not None:
+            physical_value = max(physical_value, lower)
+        if upper is not None:
+            physical_value = min(physical_value, upper)
+        return physical_value / self.scale
 
     def __repr__(self):
         out = (
@@ -85,7 +131,7 @@ class LMFitterOptimisation(object):
     'Represents a single optimisation step in the LMFitter object.'
 
     def __init__(self, lm_fitter, sim_tensile_tests, _damping_factor=None, _error=None,
-                 _delay_validation=False):
+                 _actual_error=None, _delay_validation=False):
 
         # TODO: probably better to use __new__ somehow instead of this nonsense:
         if not _delay_validation:
@@ -103,6 +149,7 @@ class LMFitterOptimisation(object):
         # These are assigned by `find_new_parameters`:
         self._damping_factor = _damping_factor
         self._error = _error
+        self._actual_error = _actual_error
 
     def _validate(self, lm_fitter):
 
@@ -121,6 +168,7 @@ class LMFitterOptimisation(object):
             'sim_tensile_tests': [i.to_dict() for i in self.sim_tensile_tests],
             '_damping_factor': self.damping_factor,
             '_error': self.error,
+            '_actual_error': self.actual_error,
         }
         return out
 
@@ -146,11 +194,27 @@ class LMFitterOptimisation(object):
         return self._damping_factor
 
     @property
+    def actual_error(self):
+        return self._actual_error
+
+    @property
     def trial_damping_factors(self):
         if self.index > 0:
             prev_opt = self.lm_fitter.optimisations[self.index - 1]
             prev_damp = prev_opt.damping_factor
-            out = [2 * prev_damp, prev_damp, 0.5 * prev_damp]
+            if self.index > 1:
+                prior_opt = self.lm_fitter.optimisations[self.index - 2]
+                worsened = (prev_opt.actual_error is not None and
+                            prior_opt.actual_error is not None and
+                            prev_opt.actual_error > prior_opt.actual_error)
+            else:
+                worsened = False
+
+            if worsened:
+                # The last proposed step increased the measured simulation error.
+                out = [10 * prev_damp, 4 * prev_damp, 2 * prev_damp]
+            else:
+                out = [2 * prev_damp, prev_damp, 0.5 * prev_damp]
         else:
             out = self.lm_fitter.initial_damping
 
@@ -266,16 +330,17 @@ class LMFitterOptimisation(object):
     def jacobian(self):
         return self._jacobian
 
-    def find_new_parameters(self):
+    def find_new_parameters(self, damping_factors=None):
 
         deltas = []
         errors = []
+        damping_factors = damping_factors or self.trial_damping_factors
 
         jac_prod = self.jacobian.T @ self.jacobian
         right = self.jacobian.T @ (self.get_exp_stress() -
                                    self.get_sim_stress(0))[:, None]
 
-        for damping in self.trial_damping_factors:
+        for damping in damping_factors:
 
             left = jac_prod + damping * np.diag(jac_prod)
             delta = np.linalg.solve(left, right)
@@ -287,18 +352,22 @@ class LMFitterOptimisation(object):
         best_idx = np.argmin(errors)
         best_delta = deltas[best_idx]
 
-        self._damping_factor = self.trial_damping_factors[best_idx]
+        self._damping_factor = damping_factors[best_idx]
         self._error = errors[best_idx]
 
-        cur_params = [i.values[-1] for i in self.lm_fitter.fitting_params]
-        
-        delta_ratio = [j/i for i, j in zip(cur_params, best_delta)]
-        max_delta_ratio = max(delta_ratio)
-
+        cur_params = np.array([
+            param.values[self.index] for param in self.lm_fitter.fitting_params
+        ])
+        delta = best_delta[:, 0]
+        relative_scale = np.where(cur_params == 0, 1.0, np.abs(cur_params))
+        max_delta_ratio = np.max(np.abs(delta) / relative_scale)
         if max_delta_ratio > 0.5:
-            delta_ratio = [i/max_delta_ratio*0.5 for i in delta_ratio]
-        
-        new_params = [i*(1+j) for i, j in zip(cur_params, delta_ratio)] 
+            delta *= 0.5 / max_delta_ratio
+
+        new_params = [
+            param._constrain(value + change) if param.bounds is not None else value + change
+            for param, value, change in zip(self.lm_fitter.fitting_params, cur_params, delta)
+        ]
 
         return new_params
 
@@ -332,6 +401,7 @@ class LMFitter(object):
             List of FittingParameter objects, one for each parameter to be fit. The
             `address` attribute of each FittingParameter must point to a valid location
             within `single_crystal_parameters`.
+            Optional `bounds` on each parameter are enforced in physical units.
 
         """
 
@@ -463,13 +533,36 @@ class LMFitter(object):
             TensileTest objects should be given in the same order as the
             fitting parameters.
 
+        The measured baseline error is used to increase damping for the next update
+        and rejects a proposed update if its measured baseline error is worse than the
+        last accepted iteration. In that case, the last accepted Jacobian is reused
+        with larger damping and the method returns False; rerun the simulations using
+        the newly suggested parameters. An accepted iteration returns True.
+
         """
 
         opt = LMFitterOptimisation(self, tensile_tests)
+        opt._actual_error = np.mean(np.abs(opt.get_exp_stress() - opt.get_sim_stress(0)))
+
+        if self.optimisations:
+            prev_opt = self.optimisations[-1]
+            if (prev_opt.actual_error is not None and
+                    opt.actual_error > prev_opt.actual_error):
+                damping_factors = [
+                    10 * prev_opt.damping_factor,
+                    4 * prev_opt.damping_factor,
+                    2 * prev_opt.damping_factor,
+                ]
+                new_params = prev_opt.find_new_parameters(damping_factors)
+                for param, value in zip(self.fitting_params, new_params):
+                    param.values[-1] = value
+                return False
+
         self.optimisations.append(opt)
         new_params = opt.find_new_parameters()
         for i, j in zip(self.fitting_params, new_params):
             i.values = np.append(i.values, j)
+        return True
 
     def get_new_single_crystal_params(self, fitting_idx):
 

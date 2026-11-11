@@ -21,7 +21,7 @@ class LoadResponseTestCase(unittest.TestCase):
         stress *= 1e4
         stress[:, 1, 1] *= 1e5  # The "uniaxial" component
 
-        resp = LoadResponse(true_stress=stress)
+        resp = LoadResponse(stress=stress)
         self.assertTrue(resp.is_uniaxial())
 
     def test_get_yield_stress_value_idx(self):
@@ -32,7 +32,7 @@ class LoadResponseTestCase(unittest.TestCase):
         equiv_strain = np.linspace(0, 1e-3, num=num_increments)
         stress = np.random.random((num_increments, 3, 3))
 
-        resp = LoadResponse(true_stress=stress, equivalent_strain=equiv_strain)
+        resp = LoadResponse(stress=stress, equivalent_strain=equiv_strain)
         vals = [0.00035, 0.00045]
         yield_point_criteria = YieldPointCriteria('equivalent_strain', vals)
 
@@ -64,7 +64,7 @@ class LoadResponseSetTestCase(unittest.TestCase):
         stress = np.random.random((num_responses, num_increments, 3, 3))
 
         responses = [
-            LoadResponse(true_stress=stress[idx], equivalent_strain=equiv_strain)
+            LoadResponse(stress=stress[idx], equivalent_strain=equiv_strain)
             for idx in range(num_responses)
         ]
         load_set = LoadResponseSet(responses)
@@ -76,10 +76,10 @@ class LoadResponseSetTestCase(unittest.TestCase):
         resp_idx = 3
 
         for i in load_set.yield_stresses:
-            if i['YPC_idx'] == ypc_idx and i['YPC_value_idx'] == ypc_val_idx:
-                all_resp_idx = np.array(load_set.yield_stresses[ypc_idx]['response_idx'])
+            if i.YPC_idx == ypc_idx and i.YPC_value_idx == ypc_val_idx:
+                all_resp_idx = np.array(load_set.yield_stresses[ypc_idx].response_idx)
                 value_idx = np.where(all_resp_idx == resp_idx)[0][0]
-                yld_stress_all = load_set.yield_stresses[ypc_idx]['values'][value_idx]
+                yld_stress_all = load_set.yield_stresses[ypc_idx].values[value_idx]
                 break
 
         yld_stress_resp = responses[resp_idx].get_yield_stress(
@@ -105,7 +105,7 @@ class LoadResponseSetTestCase(unittest.TestCase):
         stress = np.random.random((num_responses, num_increments, 3, 3))
 
         responses = [
-            LoadResponse(true_stress=stress[idx], equivalent_strain=equiv_strain[idx])
+            LoadResponse(stress=stress[idx], equivalent_strain=equiv_strain[idx])
             for idx in range(num_responses)
         ]
         load_set = LoadResponseSet(responses)
@@ -117,10 +117,10 @@ class LoadResponseSetTestCase(unittest.TestCase):
         resp_idx = 3
 
         for i in load_set.yield_stresses:
-            if i['YPC_idx'] == ypc_idx and i['YPC_value_idx'] == ypc_val_idx:
-                all_resp_idx = np.array(load_set.yield_stresses[ypc_idx]['response_idx'])
+            if i.YPC_idx == ypc_idx and i.YPC_value_idx == ypc_val_idx:
+                all_resp_idx = np.array(load_set.yield_stresses[ypc_idx].response_idx)
                 value_idx = np.where(all_resp_idx == resp_idx)[0][0]
-                yld_stress_all = load_set.yield_stresses[ypc_idx]['values'][value_idx]
+                yld_stress_all = load_set.yield_stresses[ypc_idx].values[value_idx]
                 break
 
         yld_stress_resp = responses[resp_idx].get_yield_stress(
@@ -137,7 +137,7 @@ class LoadResponseSetTestCase(unittest.TestCase):
         equiv_strain = np.linspace(0, 1e-3, num=num_increments)
         stress = np.random.random((num_increments, 3, 3))
 
-        response_1 = LoadResponse(true_stress=stress)
+        response_1 = LoadResponse(stress=stress)
         response_2 = LoadResponse(equivalent_strain=equiv_strain)
 
         with self.assertRaises(InhomogeneousDataError):
@@ -154,7 +154,7 @@ class LoadResponseSetTestCase(unittest.TestCase):
         equiv_strain_2 = np.linspace(0, 1e-3, num=num_increments_2)
         stress_2 = np.random.random((num_increments_2, 3, 3))
 
-        response_1 = LoadResponse(true_stress=stress_1, equivalent_strain=equiv_strain_1)
-        response_2 = LoadResponse(true_stress=stress_2, equivalent_strain=equiv_strain_2)
+        response_1 = LoadResponse(stress=stress_1, equivalent_strain=equiv_strain_1)
+        response_2 = LoadResponse(stress=stress_2, equivalent_strain=equiv_strain_2)
 
         LoadResponseSet([response_1, response_2])
