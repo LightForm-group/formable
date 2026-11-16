@@ -1,5 +1,15 @@
 # Change Log
 
+## Unreleased
+
+### Fixed
+
+- Score Levenberg-Marquardt damping candidates after applying the relative step
+  limit and parameter bounds, so the recorded predicted error describes the
+  proposed parameters.
+- Clarify that fitting parameter perturbations are fractional changes, not
+  multiplicative factors.
+
 ## [0.1.21] - 2023.11.09
 
 ### Fixed

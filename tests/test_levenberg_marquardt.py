@@ -70,6 +70,44 @@ class LMFitterOptimisationTestCase(unittest.TestCase):
 
         self.assertAlmostEqual(opt.find_new_parameters()[0] * 10, 8)
 
+    def test_damping_scores_step_after_relative_limit(self):
+        opt = self._optimisation_with_delta(0)
+        opt.lm_fitter.fitting_params.append(
+            FittingParameter('hardening', [10], [], 0.1)
+        )
+        opt._jacobian = np.array([[3., 0.], [0., -1.], [-3., 4.]])
+        residual = np.array([5., 2., -2.])
+        opt.get_exp_stress = lambda: residual
+        opt.get_sim_stress = lambda sim_idx: np.zeros(3)
+
+        proposed = opt.find_new_parameters([0.1, 1., 10.])
+
+        self.assertEqual(opt.damping_factor, 1.)
+        np.testing.assert_allclose(proposed, [1.5, 10 / 11])
+        expected_error = np.sum(np.abs(
+            residual - opt.jacobian @ (np.array(proposed) - 1)
+        ))
+        self.assertAlmostEqual(opt.error, expected_error)
+
+    def test_damping_scores_step_after_bounds(self):
+        opt = self._optimisation_with_delta(0, bounds=(10, 12))
+        opt.lm_fitter.fitting_params.append(
+            FittingParameter('hardening', [10], [], 0.1)
+        )
+        opt._jacobian = np.array([[3., 0.], [0., -1.], [-3., 4.]])
+        residual = np.array([5., 2., -2.])
+        opt.get_exp_stress = lambda: residual
+        opt.get_sim_stress = lambda sim_idx: np.zeros(3)
+
+        proposed = opt.find_new_parameters([0.1, 1., 10.])
+
+        self.assertEqual(opt.damping_factor, 1.)
+        np.testing.assert_allclose(proposed, [1.2, 10 / 11])
+        expected_error = np.sum(np.abs(
+            residual - opt.jacobian @ (np.array(proposed) - 1)
+        ))
+        self.assertAlmostEqual(opt.error, expected_error)
+
     def test_worsened_actual_error_increases_next_damping_trials(self):
         fitter = SimpleNamespace(optimisations=[
             SimpleNamespace(damping_factor=1, actual_error=4),

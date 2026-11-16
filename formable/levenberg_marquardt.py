@@ -18,6 +18,10 @@ class FittingParameter(object):
     def __init__(self, name, values, address, perturbation, scale=None, bounds=None):
         """Create a parameter.
 
+        `perturbation` is a fractional change: 0.05 requests a 5% increase, not
+        a multiplier of 1.05. Bounds clip the perturbation, or reverse its
+        direction if clipping would leave the value unchanged.
+
         `bounds`, when supplied, are inclusive limits in the parameter's physical
         units. Use `None` for an unbounded end, e.g. `(0, None)` for a positive value.
         """
@@ -331,45 +335,43 @@ class LMFitterOptimisation(object):
         return self._jacobian
 
     def find_new_parameters(self, damping_factors=None):
+        """Choose damping using the predicted error of the limited, bounded step."""
 
-        deltas = []
+        candidates = []
         errors = []
         damping_factors = damping_factors or self.trial_damping_factors
-
-        jac_prod = self.jacobian.T @ self.jacobian
-        right = self.jacobian.T @ (self.get_exp_stress() -
-                                   self.get_sim_stress(0))[:, None]
-
-        for damping in damping_factors:
-
-            left = jac_prod + damping * np.diag(jac_prod.diagonal())
-            delta = np.linalg.solve(left, right)
-            stress_diff = (self.get_exp_stress() - self.get_sim_stress(0))[:, None]
-            error = np.sum(np.abs(stress_diff - self.jacobian @ delta))
-            deltas.append(delta)
-            errors.append(error)
-
-        best_idx = np.argmin(errors)
-        best_delta = deltas[best_idx]
-
-        self._damping_factor = damping_factors[best_idx]
-        self._error = errors[best_idx]
 
         cur_params = np.array([
             param.values[self.index] for param in self.lm_fitter.fitting_params
         ])
-        delta = best_delta[:, 0]
         relative_scale = np.where(cur_params == 0, 1.0, np.abs(cur_params))
-        max_delta_ratio = np.max(np.abs(delta) / relative_scale)
-        if max_delta_ratio > 0.5:
-            delta *= 0.5 / max_delta_ratio
+        stress_diff = (self.get_exp_stress() - self.get_sim_stress(0))[:, None]
+        jac_prod = self.jacobian.T @ self.jacobian
+        right = self.jacobian.T @ stress_diff
 
-        new_params = [
-            param._constrain(value + change) if param.bounds is not None else value + change
-            for param, value, change in zip(self.lm_fitter.fitting_params, cur_params, delta)
-        ]
+        for damping in damping_factors:
 
-        return new_params
+            left = jac_prod + damping * np.diag(jac_prod.diagonal())
+            delta = np.linalg.solve(left, right)[:, 0]
+            max_delta_ratio = np.max(np.abs(delta) / relative_scale)
+            if max_delta_ratio > 0.5:
+                delta *= 0.5 / max_delta_ratio
+
+            new_params = [
+                param._constrain(value + change) if param.bounds is not None else value + change
+                for param, value, change in zip(self.lm_fitter.fitting_params, cur_params, delta)
+            ]
+            actual_delta = (np.array(new_params) - cur_params)[:, None]
+            error = np.sum(np.abs(stress_diff - self.jacobian @ actual_delta))
+            candidates.append(new_params)
+            errors.append(error)
+
+        best_idx = np.argmin(errors)
+
+        self._damping_factor = damping_factors[best_idx]
+        self._error = errors[best_idx]
+
+        return candidates[best_idx]
 
 
 class LMFitter(object):
