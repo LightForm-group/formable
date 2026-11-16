@@ -277,7 +277,7 @@ class LMFitterOptimisation(object):
 
         for damping in self.trial_damping_factors:
 
-            left = jac_prod + damping * np.diag(jac_prod)
+            left = jac_prod + damping * np.diag(jac_prod.diagonal())
             delta = np.linalg.solve(left, right)
             stress_diff = (self.get_exp_stress() - self.get_sim_stress(0))[:, None]
             error = np.sum(np.abs(stress_diff - self.jacobian @ delta))
